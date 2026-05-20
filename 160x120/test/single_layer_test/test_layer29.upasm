@@ -1,0 +1,9 @@
+@import LAYER_28_OUTPUT
+@import LAYER_29_OUTPUT
+@import layer29_kernel
+
+$func conv1_48in_8nout_whc(in input, in output, in nn, in kernels, in width_x_height)
+
+entry:
+	conv1_48in_8nout_whc(LAYER_28_OUTPUT, LAYER_29_OUTPUT, 3, layer29_kernel, 20*15)
+	hlt

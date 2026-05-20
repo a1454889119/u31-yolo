@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="test_headshoulder_320x160.cpp" />
+    <ClCompile Include="KalmanTracker.cpp" />
+    <ClCompile Include="u31_sqrtf.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="KalmanTracker.h" />
+    <ClInclude Include="KalmanBoxTracker.h" />
+    <ClInclude Include="u31_sqrtf.h" />
+  </ItemGroup>
+</Project>

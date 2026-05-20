@@ -1,0 +1,155 @@
+#include layer_param.upinc
+#include layer_regs.upinc
+
+#define k0_0 s0
+#define k0_1 s1
+#define k0_2 d0
+
+#define k1_0 s2
+#define k1_1 s3
+#define k1_2 d1
+
+#define k2_0 s9
+#define k2_1 s12
+#define k2_2 d2
+
+#define k3_0 s10
+#define k3_1 s11
+#define k3_2 d3
+
+#define bres s4
+#define b0 s4_0
+#define b1 s4_1
+#define b2 s4_2
+#define b3 s4_3
+
+#define in16 s6
+#define in4 s7_0
+#define in16_p0 s6_01
+#define in16_p1 s6_23
+#define in0 s8
+#define in1 s13
+#define in2 s7_01
+
+#define w outw
+#define h outh
+#define mulshift layer_mulshift
+
+#define kptr ptr2
+#define tarptr ptr3
+#define count r24
+#define thres r25
+#define maxcount r26
+#define x r27
+#define y r28
+#define rj0 r29
+#define rj1 r30
+#define rj2 r31
+#define rj3 r32
+#define rj_end r33
+#define score r34
+
+@import sigmoid
+@export conv1_20in_4out_linear_cwh
+conv1_20in_4out_linear_cwh:
+	push rp
+	mov kptr kadr
+	mov inptr inadr
+	mov outptr outadr
+	INIT_SIGMOID
+
+	lm_d   k0_0 kptr
+	lm_d   k0_1 kptr
+	l64_d  k0_2 kptr
+	lm_d   k1_0 kptr
+	lm_d   k1_1 kptr
+	l64_d  k1_2 kptr
+	lm_d   k2_0 kptr
+	lm_d   k2_1 kptr
+	l64_d  k2_2 kptr
+	lm_d   k3_0 kptr
+	lm_d   k3_1 kptr
+	l64_d  k3_2 kptr
+
+	lc tarptr, TMP_TARGET_ADDR	
+	lcs count 0
+	sw tarptr 0
+	lc thres, SCORE_THRES
+	lcs maxcount, MAX_TMP_TARGET_COUNT
+	lcs y 0
+	lcs rj_end END
+	$jump_regs rj0 rj1 rj2 rj3
+	whileu y < h {
+		lcs x 0
+		whileu x < w {
+			lm_d bres badr
+			lm_d in16 inptr
+			lw_d in4 inptr
+			simd_8to16 in0 in16_p0
+			simd_8to16 in1 in16_p1
+			simd_8to16 s7 s7_01
+	
+			simd_mac16_8 b0 k0_0 in0
+			simd_mac16_8 b1 k1_0 in0
+			simd_mac16_8 b2 k2_0 in0
+			simd_mac16_8 b3 k3_0 in0
+			simd_mac16_8 b0 k0_1 in1
+			simd_mac16_8 b1 k1_1 in1
+			simd_mac16_8 b2 k2_1 in1
+			simd_mac16_8 b3 k3_1 in1
+			simd_mac16_4 b0 k0_2 in2
+			simd_mac16_4 b1 k1_2 in2
+			simd_mac16_4 b2 k2_2 in2
+			simd_mac16_4 b3 k3_2 in2
+
+			//srs b0 b0 mulshift
+			//srs b1 b1 mulshift
+			//srs b2 b2 mulshift
+			//srs b3 b3 mulshift	
+			
+			max score b0 b1
+			max score b2 score
+			max score b3 score
+			srs score score mulshift
+			simd_shift32 bres bres mulshift
+
+			ifs score > thres {
+				mov sigv score
+				call sigmoid
+				ssl tarptr x
+				ssl tarptr y
+				ifs score == b0 {
+					ssl tarptr 0
+				} else {
+					ifs score == b1 {
+						ssl tarptr 1
+					} else {
+						ifs score == b2 {
+							ssl tarptr 2
+						} else {
+							ssl tarptr 3
+						}
+					}
+				}
+				ssl tarptr sigv
+				inc count 1
+				cjmpuge rj_end count maxcount
+			}
+			// 下面可以不用存
+			ssl outptr b0
+			ssl outptr b1
+			ssl outptr b2
+			ssl outptr b3
+
+			inc x 1
+		}
+		inc y 1
+	}
+	$jump_regs end
+
+END:
+	lc x, TMP_TARGET_ADDR
+	sw x count
+	nop
+	pop rp
+	ret

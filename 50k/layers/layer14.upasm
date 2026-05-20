@@ -1,0 +1,148 @@
+//---------------LAYER 14(conv)-------------
+//input:44x22x8
+//output:44x22x18
+//k1s1p0,group=1
+//leaky
+// cwh
+#include "layers_common.upinc"
+
+#define in0 s0
+
+#define br0 s4
+#define br1 s5
+#define br2 r3
+#define br0_0 s4_0
+#define br0_1 s4_1
+#define br0_2 s4_2
+#define br0_3 s4_3
+#define br1_0 s5_0
+#define br1_1 s5_1
+#define br1_2 s5_2
+#define br1_3 s5_3
+
+#define k0 s1
+#define k1 s2
+#define k2 s3
+#define k3 s6
+#define k4 s7
+#define k5 s8
+#define k6 s9
+#define k7 s10
+#define k8 s11
+
+#define input_end r4
+#define input_start r5
+#define i r7
+#define output_ptr r8
+#define output_start r9
+#define bias_ptr r10
+
+#define output_stride r11
+#define tmp r12
+
+#define input_ptr ptr0
+#define kernel_ptr ptr1
+
+@export layer_14
+layer_14:
+	lc input_ptr layer_13_output
+	lcs tmp 15488
+	add input_end input_ptr tmp
+	lcs output_ptr layer_14_output
+	mov bias_ptr bias_addr
+	mov kernel_ptr kernel_addr
+	mov input_start input_ptr
+	add output_start output_ptr 36
+	lcs output_stride 72
+
+	lcs i 0
+	$jump_regs r20 r21 ...
+	// 2轮, 每轮得到9个输出通道
+	// 由于输出内存需要对齐, 因此不能用循环2次的方式
+	
+	lm k0 kernel_ptr
+	lm k1 kernel_ptr
+	lm k2 kernel_ptr
+	lm k3 kernel_ptr
+	lm k4 kernel_ptr
+	lm k5 kernel_ptr
+	lm k6 kernel_ptr
+	lm k7 kernel_ptr
+	lm k8 kernel_ptr
+
+	mov input_ptr input_start
+	mov output_ptr output_start
+	whileu input_ptr < input_end {
+		lm in0 input_ptr
+		lm br0 bias_ptr
+		lm br1 bias_ptr 16
+		lw br2 bias_ptr 32
+
+		simd_mac16_8 br0_0 in0 k0
+		simd_mac16_8 br0_1 in0 k1
+		simd_mac16_8 br0_2 in0 k2
+		simd_mac16_8 br0_3 in0 k3
+		simd_mac16_8 br1_0 in0 k4
+		simd_mac16_8 br1_1 in0 k5
+		simd_mac16_8 br1_2 in0 k6
+		simd_mac16_8 br1_3 in0 k7
+		simd_mac16_8 br2   in0 k8
+		nop
+
+		simd_leaky d0 br0 10
+		simd_leaky d1 br1 10
+		leaky br2 br2 10
+
+		sw output_ptr d0_lo 0
+		sw output_ptr d0_hi 4
+		sw output_ptr d1_lo 8
+		sw output_ptr d1_hi 12
+		ssl output_ptr br2 16
+
+		inc output_ptr output_stride
+	}
+	inc bias_ptr 36
+	inc output_start 18
+
+	lm k0 kernel_ptr
+	lm k1 kernel_ptr
+	lm k2 kernel_ptr
+	lm k3 kernel_ptr
+	lm k4 kernel_ptr
+	lm k5 kernel_ptr
+	lm k6 kernel_ptr
+	lm k7 kernel_ptr
+	lm k8 kernel_ptr
+
+	mov input_ptr input_start
+	mov output_ptr output_start
+	whileu input_ptr < input_end {
+		lm in0 input_ptr
+		lw br2 bias_ptr
+		lm br0 bias_ptr 4
+		lm br1 bias_ptr 20
+
+		simd_mac16_8 br2 in0 k0
+		simd_mac16_8 br0_0 in0 k1
+		simd_mac16_8 br0_1 in0 k2
+		simd_mac16_8 br0_2 in0 k3
+		simd_mac16_8 br0_3 in0 k4
+		simd_mac16_8 br1_0 in0 k5
+		simd_mac16_8 br1_1 in0 k6
+		simd_mac16_8 br1_2 in0 k7
+		simd_mac16_8 br1_3 in0 k8
+		nop
+		nop
+
+		simd_leaky d0 br0 10
+		simd_leaky d1 br1 10
+		leaky br2 br2 10
+
+		ssl output_ptr br2 0
+		s64 output_ptr d0 2
+		s64 output_ptr d1 10
+		inc output_ptr output_stride
+	}
+	$jump_regs end
+	
+	ret

@@ -1,0 +1,16 @@
+
+#define PTR0_OFFSET_ADR 0x09000058
+#define PTR1_OFFSET_ADR 0x0900005c
+#define PTR2_OFFSET_ADR 0x09000060
+#define PTR3_OFFSET_ADR 0x09000064
+
+#define conv1_w 			r0
+#define conv1_h 			r1
+#define conv1_in_stride 	r2
+#define conv1_in_adr 		r3
+#define conv1_out_adr 		r4
+#define conv1_bias_adr 		r6
+#define conv1_kernel_adr 	r7
+
+#define conv1_out_stride 	r8
+#define conv1_input_end 	r9

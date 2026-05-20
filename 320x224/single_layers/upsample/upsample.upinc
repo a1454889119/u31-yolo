@@ -1,0 +1,9 @@
+
+#define upsample_in_w r0
+#define upsample_in_h r1
+
+#define upsample_in_adr r2
+#define merge_in_adr r3
+#define upsample_out_adr r4
+
+@import upsample_merge

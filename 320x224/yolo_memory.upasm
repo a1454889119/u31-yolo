@@ -1,0 +1,23 @@
+
+@auto_export_start
+
+tmp_rp_adr0:
+.reserve 4
+
+tmp_rp_adr1:
+.reserve 4
+
+group_mem_adr:
+.reserve 4*16
+
+.align 16
+cmos_cache_begin:
+.reserve 0x7f0
+cmos_cache_end:
+.reserve 0x10
+
+yolo_memory:
+.reserve 200432
+yolo_memory_end:
+
+@auto_export_end

@@ -1,0 +1,75 @@
+
+#define SAVE_WHC 0
+#define SAVE_CWH 1
+#define SAVE_WHC_CWH 2
+#define SAVE_WHC_16BIT 3
+
+#define SIZE_20X10X24 0
+#define SIZE_40X20X24 1
+#define SIZE_80X40X24 2
+
+//$func conv3s2_1in_8out_cwh()
+//$func conv3_gx1_cwh(in isLeaky, in stride)
+//$func conv3_gxn_cwh(in nn)
+
+//$func conv1_8in_8out_whc()
+//$func conv1_8in_24out_cwh()
+//$func conv1_12in_12out_whc()
+
+
+//$func conv1_48in_8nout(in n, in outtype)
+//$func conv1_24inout(in outtype)
+//$func conv1_24inout_sigmoid()
+//$func conv1_24in_20out_linear_whc()
+//$func conv1_20in_20out_linear_cwh()
+//$func conv1_20in_2out_linear_cwh()
+//$func conv1_20in_40out_linear_cwh()
+//$func conv1_144in_48out_cwh()
+//$func conv1_96in_48out_whc()
+//$func conv1_120in_48out_whc()
+
+//$func maxpool5_40x20x24(in outtype)
+
+//$func global_avg(in sizetype)
+//$func mul_whc(in sizetype)
+//$func upsample_whc(in sizetype)
+
+@import conv3s2_1in_8out_cwh
+@import conv3_gx1_cwh
+@import conv3_gxn_cwh
+
+@import conv1_8in_8out_whc
+@import conv1_8in_24out_cwh
+@import conv1_12in_12out_whc
+@import conv1_48in_8nout
+@import conv1_24inout
+@import conv1_24inout_2parts_in_whc16bit_out
+@import conv1_24inout_sigmoid
+@import conv1_24in_20out_linear_whc
+@import conv1_20in_20out_linear_cwh
+
+#if NUM_CLASSES == 4
+@import conv1_20in_4out_linear_cwh
+#define calc_scores conv1_20in_4out_linear_cwh 
+#endif
+
+#if NUM_CLASSES == 3
+@import conv1_20in_3out_linear_cwh
+#define calc_scores conv1_20in_3out_linear_cwh 
+#endif
+
+#if NUM_CLASSES == 2
+@import conv1_20in_2out_linear_cwh
+#define calc_scores conv1_20in_2out_linear_cwh 
+#endif
+
+
+@import conv1_20in_40out_linear_cwh
+@import conv1_144in_48out_cwh
+@import conv1_96in_48out_whc
+@import conv1_120in_48out_cwh
+
+@import maxpool5_40x20x24
+@import global_avg
+@import mul_whc
+@import upsample_whc

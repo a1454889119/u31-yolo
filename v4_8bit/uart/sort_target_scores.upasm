@@ -1,0 +1,118 @@
+#include layer_memory.upinc
+#include layer_param.upinc
+
+@import MEMORY
+#define src_tarptr ptr0
+#define scores_adr r0
+#define scores_end r1
+
+#define count r2
+#define x0 r3
+#define y0 r4
+#define x1 r5
+#define y1 r6
+#define score r7
+#define type r8
+#define i r9
+#define curr_score_adr r10
+#define j r12
+#define jscore r13
+#define k r14
+#define t r15
+#define kscore r16
+#define tlow r17
+#define thigh r18
+#define ff r19
+#define type_size r20
+
+#define cx s4_2
+#define cy s4_3
+#define tw s4_0
+#define th s4_1
+
+// 目标分类排序,并按串口输出的顺序保存
+@export sort_target_scores
+sort_target_scores:
+	lc src_tarptr, TARGETS_ADDR
+	lc scores_adr, IMAGE_ADDR
+	lcs t, NUM_CLASSES*MAX_TARGET_PER_CLASS*SCORE_TARGET_SIZE
+	add scores_end scores_adr, t
+	lw count src_tarptr
+	lcs ff 0xff
+
+	// 把scores_adr填0
+	mov ptr1 scores_adr
+	whileu ptr1 < scores_end {
+		sw ptr1 0
+	}
+
+	lcs i 0
+	lcs type_size, MAX_TARGET_PER_CLASS*SCORE_TARGET_SIZE
+
+	$jump_regs r30 ...
+	whileu i < count {
+		lw_d type src_tarptr
+		lw_d score src_tarptr
+		lm_d s4 src_tarptr
+		sru score score 2 // score本来是0~1023,右移2位是0~255
+
+		muls16 curr_score_adr type, type_size
+		inc curr_score_adr scores_adr
+		lcs j 0
+		whileu j < type_size {
+			lw jscore curr_score_adr j
+			ifu score > jscore {
+				ifu jscore > 0 {
+					// 后面要顺延, 从后往前读写
+					lcs k, SCORE_TARGET_SIZE*(MAX_TARGET_PER_CLASS-2)
+					whiles k >= j {
+						add ptr1 curr_score_adr k
+						add ptr2 ptr1 SCORE_TARGET_SIZE
+						lw kscore ptr1
+						ifu kscore > 0 {
+							lw tlow ptr1
+							lw thigh ptr1
+							sw ptr2 kscore
+							sw ptr2 tlow
+							sw ptr2 thigh
+						}
+						sub k k SCORE_TARGET_SIZE
+					}
+				}
+				add ptr1 curr_score_adr j
+				srs tw tw 1
+				srs th th 1	
+				sub x0 cx tw
+				add x1 cx tw
+				sub y0 cy th
+				add y1 cy th
+				sru thigh x0 8
+				and tlow x0 ff
+				sw ptr1 score
+				sbyte ptr1 tlow
+				sbyte ptr1 thigh
+		
+				sru thigh y0 8
+				and tlow y0 ff
+				sbyte ptr1 tlow
+				sbyte ptr1 thigh
+		
+				sru thigh x1 8
+				and tlow x1 ff
+				sbyte ptr1 tlow
+				sbyte ptr1 thigh
+		
+				sru thigh y1 8
+				and tlow y1 ff
+				sbyte ptr1 tlow
+				sbyte ptr1 thigh
+				break
+			}
+			inc j SCORE_TARGET_SIZE
+		}
+		inc i 1
+	}
+	$jump_regs end
+	ret
+
+

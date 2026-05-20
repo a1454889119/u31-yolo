@@ -1,0 +1,29 @@
+
+#include layer0.upinc
+#include memory_layout.upinc
+#include yolo_layer.upinc
+
+
+@import init_psram
+@import psram_init_APS3208K
+
+@import layer0_input_psram_adr
+@import yolo_run_frame
+
+entry:
+	svw 0x09000038, 0x00ff8800 //设置U31的内部晶振为12Mhz   
+	svw 0x09000000, 0x13021454   
+	call psram_init_APS3208K
+
+	svw layer0_input_psram_adr PSRAM_LAYER_0_INPUT
+loop:
+	//lc r30,0x09000040
+	//sw r30,3
+	
+	call yolo_run_frame
+	
+	//lc r30,0x09000040
+	//lw r31,r30
+	jmp loop
+
+	hlt

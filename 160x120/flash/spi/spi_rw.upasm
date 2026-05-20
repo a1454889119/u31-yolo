@@ -1,0 +1,67 @@
+#define reg_spi_buf 0x0900050c
+/*
+[31:24]  spi_cmd       //SPI指令码,发送纯数据指令码为0
+[23]     spi_wr        //1:write, 0:read  
+[18:0]   spi_dat_num   //SPI每次读/写的字节数，最大为内存大小  
+*/
+#define reg_spi_cmd 0x09000510
+
+$func copy_frame(in input, in output) {
+	reg input_end, rj0
+	lcs input_end, 160*120
+	load_reg ptr0 input
+	load_reg ptr1 output
+	inc input_end ptr0
+
+	$jump_regs rj0
+	whileu ptr0 < input_end {
+		lm_d s0 ptr0
+		lm_d s1 ptr0
+		lm_d s2 ptr0
+		lm_d s3 ptr0
+		
+		sm ptr1 s0
+		sm ptr1 s1
+		sm ptr1 s2
+		sm ptr1 s3
+	}
+	$jump_regs end
+}
+
+$func spi_write_frame(in frame_adr) {
+	reg c_0x800000, c_1280, psram_read_code
+	reg img_ptr, img_end
+	reg len, t1
+
+	lc c_0x800000 0x800000
+	lcs c_1280 1280
+	load_reg img_ptr frame_adr
+	// lc img_ptr PSRAM_LAYER_0_INPUT
+	lc img_end, 160*120
+	inc img_end img_ptr
+
+	//lc psram_read_code PSRAM_READ_CODE
+
+	whileu img_ptr < img_end {
+		sub len img_end img_ptr
+		min len len c_1280
+
+		// 接收spi数据
+		or t1 len c_0x800000
+		wait_key
+		svw reg_spi_buf,img_ptr
+		svw reg_spi_cmd,t1
+		wait_spi
+		
+		inc img_ptr len
+	}
+}
+
+@import TargetData
+$func spi_write_result() {
+	// spi发送结果(固定1280字节)
+	wait_key
+	svw reg_spi_buf, TargetData
+	svw reg_spi_cmd, 0x800500
+	wait_spi
+}

@@ -1,0 +1,18 @@
+#include layer_regs.upinc
+
+@export sigmoid
+sigmoid:
+	neg sigv sigv // -x
+	ifs sigv >= max_sigv {
+		// -x大于7, 直接返回0
+		mov sigv 0
+		ret
+	}
+	ifs sigv <= min_sigv {
+		mov sigv m22p10_1
+		ret
+	}
+	exp_m22p10(sigv, sigv)
+	inc sigv m22p10_1
+	divs32 sigv m22p10_1024 sigv
+	ret

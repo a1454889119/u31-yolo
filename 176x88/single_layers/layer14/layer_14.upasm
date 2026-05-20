@@ -1,0 +1,179 @@
+//---------------LAYER 14(conv)-------------
+//input:44x22x8
+//output:44x22x18
+//k1s1p0,group=1
+//leaky
+// cwh
+
+#import layer_14_input
+#import layer_14_input_end
+#import layer_18_input
+
+#define in s0
+
+#define br0 s4
+#define br1 s5
+#define br2 r0
+#define br0_0 s4_0
+#define br0_1 s4_1
+#define br0_2 s4_2
+#define br0_3 s4_3
+#define br1_0 s5_0
+#define br1_1 s5_1
+#define br1_2 s5_2
+#define br1_3 s5_3
+
+#define k0 s1
+#define k1 s2
+#define k2 s3
+#define k3 s6
+#define k4 s7
+#define k5 s8
+#define k6 s9
+#define k7 s10
+#define k8 s11
+
+#define input_end r1
+#define input_start r2
+#define i r4
+#define output_ptr r5
+#define output_start r6
+#define bias_ptr r7
+
+#define output_stride r8
+#define tmp r9
+
+#define input_ptr ptr0
+#define kernel_ptr ptr1
+
+
+layer_14:
+	lcs input_ptr layer_14_input
+	lcs input_end layer_14_input_end
+	lcs output_ptr layer_18_input
+	lcs kernel_ptr layer_14_kernels
+	lcs bias_ptr layer_14_biases
+	mov input_start input_ptr
+	add output_start output_ptr 36
+	lcs output_stride 72
+
+	lcs i 0
+	#jump-regs r20 r21 ...
+	// 2轮, 每轮得到9个输出通道
+	// 由于输出内存需要对齐, 因此不能用循环2次的方式
+	
+	lm k0 kernel_ptr
+	lm k1 kernel_ptr
+	lm k2 kernel_ptr
+	lm k3 kernel_ptr
+	lm k4 kernel_ptr
+	lm k5 kernel_ptr
+	lm k6 kernel_ptr
+	lm k7 kernel_ptr
+	lm k8 kernel_ptr
+
+	mov input_ptr input_start
+	mov output_ptr output_start
+	whileu input_ptr < input_end {
+		lm in input_ptr
+		lm br0 bias_ptr
+		lm br1 bias_ptr 16
+		lw br2 bias_ptr 32
+
+		simd_muladd br0_0 in k0
+		simd_muladd br0_1 in k1
+		simd_muladd br0_2 in k2
+		simd_muladd br0_3 in k3
+		simd_muladd br1_0 in k4
+		simd_muladd br1_1 in k5
+		simd_muladd br1_2 in k6
+		simd_muladd br1_3 in k7
+		simd_muladd br2   in k8
+		nop
+
+		simd_leaky d0 br0 10
+		simd_leaky d1 br1 10
+		leaky br2 br2 10
+
+		sw output_ptr d0_lo 0
+		sw output_ptr d0_hi 4
+		sw output_ptr d1_lo 8
+		sw output_ptr d1_hi 12
+		ssu output_ptr br2 16
+
+		inc output_ptr output_stride
+	}
+	inc bias_ptr 36
+	inc output_start 18
+
+	lm k0 kernel_ptr
+	lm k1 kernel_ptr
+	lm k2 kernel_ptr
+	lm k3 kernel_ptr
+	lm k4 kernel_ptr
+	lm k5 kernel_ptr
+	lm k6 kernel_ptr
+	lm k7 kernel_ptr
+	lm k8 kernel_ptr
+
+	mov input_ptr input_start
+	mov output_ptr output_start
+	whileu input_ptr < input_end {
+		lm in input_ptr
+		lw br2 bias_ptr
+		lm br0 bias_ptr 4
+		lm br1 bias_ptr 20
+
+		simd_muladd br2 in k0
+		simd_muladd br0_0 in k1
+		simd_muladd br0_1 in k2
+		simd_muladd br0_2 in k3
+		simd_muladd br0_3 in k4
+		simd_muladd br1_0 in k5
+		simd_muladd br1_1 in k6
+		simd_muladd br1_2 in k7
+		simd_muladd br1_3 in k8
+		nop
+		nop
+
+		simd_leaky d0 br0 10
+		simd_leaky d1 br1 10
+		leaky br2 br2 10
+
+		ssu output_ptr br2 0
+		s64 output_ptr d0 2
+		s64 output_ptr d1 10
+		inc output_ptr output_stride
+	}
+	#jump-regs end
+	
+	
+
+	ret
+
+layer_14_biases:
+.word 0xfff9b000 0xfff92800 0xfffe6400 0x0004c000 
+.word 0xfff22000 0xfff28400 0xfffa8400 0x0004a800 
+.word 0x000c9800 0x000c1000 0xfffa3400 0xfff95400 
+.word 0x0005f800 0x00029000 0xfffb4800 0xfff6fc00 
+.word 0x0012d400 0x00087400 
+
+layer_14_kernels:
+.short 0x01b1 0xff68 0x0024 0x0103 0xfeec 0x004d 0x001c 0xfed3 
+.short 0xfe49 0xff7b 0x0075 0x012e 0x0063 0xffb0 0x0086 0xfe93 
+.short 0x0044 0xfe12 0x0028 0xff43 0x0086 0xff63 0x0046 0xfe5a 
+.short 0xffec 0x00b8 0x0111 0x00bb 0xff75 0x00d9 0x0057 0x0145 
+.short 0x00e5 0x01af 0x0102 0xffed 0x0047 0xff78 0xfec1 0xff36 
+.short 0x00a2 0x0078 0x0074 0xffd1 0x0181 0x00c3 0xfe59 0x00fb 
+.short 0xffc1 0x01d8 0xff94 0x00fd 0x01e0 0xfff8 0x012e 0x0047 
+.short 0xfef2 0xff9a 0xffd4 0x0141 0xffde 0x0017 0xfe71 0x0078 
+.short 0x00ed 0x0123 0xff88 0xfe52 0xffea 0x00e9 0x0047 0x0190 
+.short 0x0025 0x006e 0xff84 0xfff4 0xffd8 0xff95 0xfff0 0x0240 
+.short 0x023b 0x0019 0x003a 0x00c3 0xff4d 0xff24 0xfee9 0x00ba 
+.short 0xff37 0x0074 0xffc4 0x00d4 0xffd2 0xffae 0x023b 0xff97 
+.short 0x0026 0x016a 0xfe80 0x0042 0x00dd 0x008a 0x00e1 0xfe54 
+.short 0xfed4 0xff30 0x0174 0xffdb 0xff0b 0x0023 0x00b0 0xffa7 
+.short 0xff8c 0x0119 0x0100 0x014c 0xff68 0xffd4 0x0097 0xff95 
+.short 0xfee0 0xff61 0xff81 0x0069 0xfe94 0xff6e 0xff8f 0xff12 
+.short 0xfe96 0x00be 0xff91 0xffd7 0xffa4 0x001e 0xff73 0x0059 
+.short 0xffd6 0x0099 0xfec5 0xfff3 0x0116 0x00f9 0x00f1 0x00ce 

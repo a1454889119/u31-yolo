@@ -1,0 +1,568 @@
+
+
+@export KALMAN_BBOX
+KALMAN_BBOX:
+.word 0.0, 0.0, 0.0, 0.0
+
+.align 16
+PMAT: // 13个数, 前7个代表对角线上的值
+/*
+0 - - - 7 - -
+- 1 - - - 8 -
+- - 2 - - - 9
+- - - 3 - - -    
+10- - - 4 - -
+- 11- - - 5 -
+- - 12- - - 6
+*/
+.word 0.1 0.1 0.1 0.1 0.1 0.1 0.1 0 
+.word 0 0 0 0 0 
+
+Q_DIAGONAL:
+.word 0.5, 0.5, 0.01, 0.001, 0.1, 0.1, 0.1
+
+R_DIAGONAL: // 4*4的对角线
+.word 2.0, 2.0, 10.0, 1.0
+
+.align 16
+STATE:
+.word 0 0 0 0 0 0 0 0
+
+TIME_SINCE_UPDATE:
+.word 0
+
+.align 16
+KMAT_DATA:
+.word 0 0 0 0 0 0 0 0
+
+#define IMGW_FLT 320.0
+#define IMGH_FLT 160.0
+
+
+$func KalmanTracker_Reset(in _cx, in _cy, in width, in height) {
+	reg cx, cy, w, h, area, ratio
+	lcs ptr0 STATE
+	load_reg cx _cx
+	load_reg cy _cy
+	load_reg w width
+	load_reg h height
+	fmul area w h
+	fdiv ratio w h
+
+	sw ptr0 cx
+	sw ptr0 cy
+	sw ptr0 area
+	sw ptr0 ratio
+	sw ptr0 0
+	sw ptr0 0
+	sw ptr0 0
+
+	lcs ptr0 PMAT
+	lc w, 0.1
+	sw ptr0, w
+	sw ptr0, w
+	sw ptr0, w
+	sw ptr0, w
+	sw ptr0, w
+	sw ptr0, w
+	sw ptr0, w
+	sw ptr0 0
+	sw ptr0 0
+	sw ptr0 0
+	sw ptr0 0
+	sw ptr0 0
+	sw ptr0 0
+	
+	sv TIME_SINCE_UPDATE 0
+	nop
+}
+
+$func KalmanTracker_Predict() {
+	reg tmp, decay, flt, state_ptr
+	reg t0(tmp), t1(flt), t2
+	reg cx(tmp), cy(t2), w, h
+	reg x1, x2, y1, y2
+	reg mat_ptr
+
+	// 速度衰减: 丢失帧越多, 速度逐渐衰减到接近0
+	// 这样当目标静止或慢速运动时, 预测不会大幅漂移
+	lv tmp TIME_SINCE_UPDATE
+	lc decay, 1.0
+	lc flt, 0.8
+	whiles tmp > 0 {
+		fmul decay decay flt
+		sub tmp tmp 1
+	}
+
+	//kt->state[4] *= decay;
+	//kt->state[5] *= decay;
+	//kt->state[6] *= decay;
+	simd_ext32 s5 decay
+	lcs state_ptr STATE
+	lm s4 state_ptr, 16
+	simd_fmul s4 s4 s5
+	nop
+
+	sw state_ptr s4_0 16
+	sw state_ptr s4_1 20
+	sw state_ptr s4_2 24
+	// x = F * x
+	// kt->state[0] += kt->state[4];
+	// kt->state[1] += kt->state[5];
+	// kt->state[2] += kt->state[6];
+	mov s4_3 0
+	lm s5 state_ptr
+	simd_fadd s5 s5 s4
+
+	// 面积/宽高比保护
+	// kt->state[2] = std::max(300.0f, kt->state[2]);
+	lc flt 300.0
+	fmax s5_2 flt s5_2
+	// kt->state[3] = std::min(3.3f, std::max(0.3f, kt->state[3]));
+	lc flt 0.3
+	fmax s5_3 flt s5_3
+	lc flt 3.3
+	fmin s5_3 flt s5_3
+
+	sw state_ptr s5_0 0
+	sw state_ptr s5_1 4
+	sw state_ptr s5_2 8
+
+	//float h = std::sqrt(kt->state[2] / kt->state[3]);
+	//float w = h * kt->state[3];
+	//float cx = kt->state[0];
+	//float cy = kt->state[1];
+	fdiv h s5_2 s5_3
+	fsqrt h h
+	fmul w h s5_3
+	mov cx s5_0
+	mov cy s5_1
+
+	// box->x1 = cx - w * 0.5f;
+	// box->y1 = cx - h * 0.5f;
+	// box->x2 = cx + w * 0.5f;
+	// box->y2 = cx + h * 0.5f;
+	lc flt 0.5
+	fmul w w flt
+	fmul h h flt
+	fsub x1 cx w
+	fsub y1 cy h
+	fadd x2 cx w
+	fadd y2 cy h
+
+	// box.x1 = std::max(0.0f, std::min(box.x1, (float)img_width));
+	// box.x2 = std::max(0.0f, std::min(box.x2, (float)img_width));
+	// box.y1 = std::max(0.0f, std::min(box.y1, (float)img_height));
+	// box.y2 = std::max(0.0f, std::min(box.y2, (float)img_height));
+	lc flt IMGW_FLT
+	fmin x1 x1 flt
+	fmin x2 x2 flt
+	lc flt 0.0
+	fmax x1 x1 flt
+	fmax x2 x2 flt
+
+	lc flt IMGH_FLT
+	fmin y1 y1 flt
+	fmin y2 y2 flt
+	lc flt 0.0
+	fmax y1 y1 flt
+	fmax y2 y2 flt
+
+	lcs tmp KALMAN_BBOX
+	sw tmp x1
+	sw tmp y1 4
+	sw tmp x2 8
+	sw tmp y2 12
+
+	// Update P: P = F * P * F' + Q
+	lcs mat_ptr, PMAT
+	// kt->pmat[0] = kt->pmat[0] + kt->pmat[4] + kt->pmat[7] + kt->pmat[10];
+	// kt->pmat[7] = kt->pmat[4] + kt->pmat[7];
+	// kt->pmat[10] = kt->pmat[4] + kt->pmat[10];
+	reg p4(tmp), p7(t2), p10(w), p0(h)
+	lw p0 mat_ptr, 0
+	lw p4 mat_ptr, 16
+	lw p7 mat_ptr, 28
+	lw p10 mat_ptr, 40
+	fadd p7 p7 p4
+	nop
+	fadd p0 p0 p7
+	nop
+	fadd p0 p0 p10
+	fadd p10 p10 p4
+	sw mat_ptr p0 0
+	sw mat_ptr p4 16
+	sw mat_ptr p7 28
+	sw mat_ptr p10 40
+
+	// kt->pmat[1] = kt->pmat[1] + kt->pmat[5] + kt->pmat[8] + kt->pmat[11];
+	// kt->pmat[8] = kt->pmat[5] + kt->pmat[8];
+	// kt->pmat[11] = kt->pmat[5] + kt->pmat[11];
+	nop
+	reg p5(tmp), p8(t2), p11(w), p1(h)
+	lw p1 mat_ptr, 4
+	lw p5 mat_ptr, 20
+	lw p8 mat_ptr, 32
+	lw p11 mat_ptr, 44
+	fadd p8 p8 p5
+	nop
+	fadd p1 p1 p8
+	nop
+	fadd p1 p1 p11
+	fadd p11 p11 p5
+	sw mat_ptr p1 4
+	sw mat_ptr p5 20
+	sw mat_ptr p8 32
+	sw mat_ptr p11 44
+
+	// kt->pmat[2] = kt->pmat[2] + kt->pmat[6] + kt->pmat[9] + kt->pmat[12];
+	// kt->pmat[9] = kt->pmat[6] + kt->pmat[9];
+	// kt->pmat[12] = kt->pmat[6] + kt->pmat[12];
+	nop
+	reg p6(tmp), p9(t2), p12(w), p2(h)
+	lw p2 mat_ptr, 8
+	lw p6 mat_ptr, 24
+	lw p9 mat_ptr, 36
+	lw p12 mat_ptr, 48
+	fadd p9 p9 p6
+	nop
+	fadd p2 p2 p9
+	nop
+	fadd p2 p2 p12
+	fadd p12 p12 p6
+	sw mat_ptr p2 8
+	sw mat_ptr p6 24
+	sw mat_ptr p9 36
+	sw mat_ptr p12 48
+
+	// kt->pmat[0] += qmat[0];
+	// kt->pmat[1] += qmat[1];
+	// kt->pmat[2] += qmat[2];
+	// kt->pmat[3] += qmat[3];
+	// kt->pmat[4] += qmat[4];
+	// kt->pmat[5] += qmat[5];
+	// kt->pmat[6] += qmat[6];
+	lcs ptr0 Q_DIAGONAL
+	lm s4 mat_ptr
+	lm s5 ptr0
+	simd_fadd s4 s4 s5
+	sm mat_ptr s4
+
+	nop
+	lm s4 mat_ptr, 16
+	lm s5 ptr0
+	simd_fadd s4 s4 s5
+	nop
+	sw mat_ptr s4_0 16
+	sw mat_ptr s4_1 20
+	sw mat_ptr s4_2 24
+
+
+	lv tmp TIME_SINCE_UPDATE
+	inc tmp 1
+	sv TIME_SINCE_UPDATE tmp
+	nop
+}
+
+$func KalmanTracker_Update(in _cx, in _cy, in width, in height) {
+	reg tmp, epsilon, meas_half_h
+	reg cx, cy, w, h, area, ratio
+	reg pred_cx(meas_half_h), pred_cy, meas_dx, meas_dy, meas_dist
+	reg t0(cx)
+	lc epsilon 1.192092896e-07 // EPSILON
+
+	load_reg cx _cx
+	load_reg cy _cy
+	load_reg w width
+	load_reg h height
+	fmul area w h
+	fdiv ratio w h
+
+	// FIX: 测量值也应该截断到图像边界内（与 predict() 保持一致）
+	// 这样创新向量 y = 测量 - 预测 的参考基准相同
+	// 避免目标在边界附近时, 滤波器错误地把"边界截断差"当成速度信号
+	//float meas_half_h = bh * 0.5f;
+	//cx = std::max(meas_half_h, std::min(cx, (float)kt->imgw - meas_half_h));
+	//cy = std::max(meas_half_h, std::min(cy, (float)kt->imgh - meas_half_h));
+	lc tmp 0.5
+	fmul meas_half_h h tmp
+	lc tmp IMGW_FLT
+	fsub tmp tmp meas_half_h
+	nop
+	fmin cx cx tmp
+	fmax cx cx meas_half_h
+	lc tmp IMGH_FLT
+	fsub tmp tmp meas_half_h
+	nop
+	fmin cy cy tmp
+	fmax cy cy meas_half_h
+
+
+	// FIX 2: 方向反转检测
+	// 如果测量值与预测值偏离过大(超过阈值)，说明方向发生了突变
+	// 此时不应该让卡尔曼增益过度信任观测值，而应该重置速度状态
+	//float pred_cx = kt->state[0];
+	//float pred_cy = kt->state[1];
+	//float meas_dx = cx - pred_cx;
+	//float meas_dy = cy - pred_cy;
+	//float meas_dist = std::sqrt(meas_dx * meas_dx + meas_dy * meas_dy);
+	lcs ptr0 STATE
+	nop
+	lw pred_cx ptr0
+	lw pred_cy ptr0
+	fsub meas_dx cx pred_cx
+	fsub meas_dy cy pred_cy
+	fmul pred_cx meas_dx meas_dx
+	fmul pred_cy meas_dy meas_dy
+	nop
+	fadd meas_dist pred_cx pred_cy
+	nop
+	fsqrt meas_dist meas_dist
+
+	//if (meas_dist > TrackerConfig::REVERSE_DETECT_THRESHOLD) {
+	//	// 方向反转：计算测量值相对于当前状态的"真实"速度
+	//	// 用一个小缩放因子初始化新速度, 避免旧速度惯性太大
+	//	float new_vx = meas_dx * TrackerConfig::REVERSE_VEL_SCALE;
+	//	float new_vy = meas_dy * TrackerConfig::REVERSE_VEL_SCALE;
+	//
+	//	// 重置状态中的速度为小值, 让滤波器快速收敛到新方向
+	//	// 同时增大P矩阵中对应速度的协方差, 让滤波器更快适应新速度
+	//	kt->state[4] = new_vx;
+	//	kt->state[5] = new_vy;
+	//	kt->state[6] = 0.0f;
+	//
+	//	// 增大P矩阵中对应速度的协方差, 让滤波器对新测量更敏感
+	//	kt->P[4 * 7 + 4] = 10.0f;
+	//	kt->P[5 * 7 + 5] = 10.0f;
+	//	kt->P[6 * 7 + 6] = 1.0f;
+	//	kt->pmat[4] = 10.0f;
+	//	kt->pmat[5] = 10.0f;
+	//	kt->pmat[6] = 1.0f;
+	//}
+	lc tmp 50.0
+	iff meas_dist > tmp {
+		lcs ptr0, STATE+16
+		reg new_vx(pred_cx), new_vy(pred_cy)
+		lc tmp 0.05
+		fmul new_vx meas_dx tmp
+		fmul new_vy meas_dy tmp
+
+		sw ptr0 new_vx
+		sw ptr0 new_vy
+		sw ptr0 0
+
+		lcs ptr0, PMAT+16
+		lc tmp 10.0
+		sw ptr0 tmp
+		sw ptr0 tmp
+		lc tmp 1.0
+		sw ptr0 tmp
+	}
+
+	// 创新协方差: S = H * P * H' + R
+	//cv::Mat S = H * P * H.t() + R;
+	//float smat[4] = {
+	//	kt->pmat[0] + rmat[0],
+	//	kt->pmat[1] + rmat[1],
+	//	kt->pmat[2] + rmat[2],
+	//	kt->pmat[3] + rmat[3]
+	//};
+	// s6: smat
+	lcs tmp R_DIAGONAL
+	lm s5 tmp
+	lcs tmp PMAT
+	lm s4 tmp
+	simd_fadd s6 s4 s5
+
+	// 卡尔曼增益: K = P * H' * S^(-1)
+	//float kmat[7] = {
+	//	kt->pmat[0],
+	//	kt->pmat[1],
+	//	kt->pmat[2],
+	//	kt->pmat[3],
+	//	kt->pmat[7],
+	//	kt->pmat[8],
+	//	kt->pmat[9],
+	//};
+	// s4: pmat[0,1,2,3], s5:pmat[7,8,9,10]
+	lm s5 tmp, 28
+
+	//if (fabsf(smat[0]) > FLT_EPSILON) {
+	//	kmat[0] /= smat[0];
+	//	kmat[4] /= smat[0];
+	//}
+	//else {
+	//	kmat[0] = 0.0f;
+	//	kmat[4] = 0.0f;
+	//}
+	fabs tmp s6_0
+	iff tmp > epsilon {
+		fdiv s4_0 s4_0 s6_0
+		fdiv s5_0 s5_0 s6_0
+	} else {
+		mov s4_0 0
+		mov s5_0 0
+	}
+
+	//if (fabsf(smat[1]) > FLT_EPSILON) {
+	//	kmat[1] /= smat[1];
+	//	kmat[5] /= smat[1];
+	//}
+	//else {
+	//	kmat[1] = 0.0f;
+	//	kmat[5] = 0.0f;
+	//}
+	fabs tmp s6_1
+	iff tmp > epsilon {
+		fdiv s4_1 s4_1 s6_1
+		fdiv s5_1 s5_1 s6_1
+	} else {
+		mov s4_1 0
+		mov s5_1 0
+	}
+
+	//if (fabsf(smat[2]) > FLT_EPSILON) {
+	//	kmat[2] /= smat[2];
+	//	kmat[6] /= smat[2];
+	//}
+	//else {
+	//	kmat[2] = 0.0f;
+	//	kmat[6] = 0.0f;
+	//}
+	fabs tmp s6_2
+	iff tmp > epsilon {
+		fdiv s4_2 s4_2 s6_2
+		fdiv s5_2 s5_2 s6_2
+	} else {
+		mov s4_2 0
+		mov s5_2 0
+	}
+
+	//if (fabsf(smat[3]) > FLT_EPSILON) {
+	//	kmat[3] /= smat[3];
+	//}
+	//else {
+	//	kmat[3] = 0.0f;
+	//}
+	lcs ptr0 KMAT_DATA
+	fabs tmp s6_3	
+	iff tmp > epsilon {
+		fdiv s4_3 s4_3 s6_3
+	} else {
+		mov s4_3 0
+	}
+	nop
+	// 保存kmat
+	sm ptr0 s4
+	sm ptr0 s5
+
+	
+	//float IKH[7] = {
+	//	1.0f - kmat[0],
+	//	1.0f - kmat[1],
+	//	1.0f - kmat[2],
+	//	1.0f - kmat[3],
+	//	-kmat[4],
+	//	-kmat[5],
+	//	-kmat[6]
+	//};
+	lc tmp 1.0
+	simd_ext32 s6 tmp
+	simd_fsub s4 s6 s4
+	lcs tmp 0
+	simd_ext32 s6 tmp
+	simd_fsub s5 s6 s5
+
+	// 更新协方差: P = (I - K * H) * P
+	// s4 : IKH[0~3], s5: IKH[4,5,6]
+	// s6 : pmat[0~3], s7:pmat[7~10]
+	//kt->pmat[7] = kt->pmat[7] + (kt->pmat[0] * IKH[4]);
+	//kt->pmat[8] = kt->pmat[8] + (kt->pmat[1] * IKH[5]);
+	//kt->pmat[9] = kt->pmat[9] + (kt->pmat[2] * IKH[6]);
+	lcs tmp PMAT
+	lm s6 tmp
+	lm s7 tmp 28
+	simd_fmul s6 s6 s5
+	simd_fadd s7 s7 s6
+	lm s6 tmp // 提取读取
+	sw tmp s7_0 28
+	sw tmp s7_1 32
+	sw tmp s7_2 36
+
+	//kt->pmat[0] = kt->pmat[0] * IKH[0];
+	//kt->pmat[1] = kt->pmat[1] * IKH[1];
+	//kt->pmat[2] = kt->pmat[2] * IKH[2];
+	//kt->pmat[3] = kt->pmat[3] * IKH[3];
+	simd_fmul s6 s6 s4
+	sm tmp s6
+	
+	// s6 : pmat[4,5,6,7], s7:pmat[10,11,12,13]
+	//kt->pmat[4] = kt->pmat[4] + (kt->pmat[10] * IKH[4]);
+	//kt->pmat[5] = kt->pmat[5] + (kt->pmat[11] * IKH[5]);
+	//kt->pmat[6] = kt->pmat[6] + (kt->pmat[12] * IKH[6]);
+	nop
+	lm s6 tmp 16
+	lm s7 tmp 40
+	simd_fmul s7 s7 s5
+	simd_fadd s6 s6 s7
+	lm s7 tmp 40 // 提前读取
+	sw tmp s6_0 16
+	sw tmp s6_1 20
+	sw tmp s6_2 24
+
+	
+	//kt->pmat[10] = kt->pmat[10] * IKH[0];
+	//kt->pmat[11] = kt->pmat[11] * IKH[1];
+	//kt->pmat[12] = kt->pmat[12] * IKH[2];
+	simd_fmul s7 s7 s4
+	nop
+	sw tmp s7_0 40
+	sw tmp s7_1 44
+	sw tmp s7_2 48
+
+	// y = z - z_hat
+	//float ymat[4] = {
+	//	cx - kt->state[0],
+	//	cy - kt->state[1],
+	//	s - kt->state[2],
+	//	r - kt->state[3]
+	//};
+	mov s4_0 cx
+	mov s4_1 cy
+	mov s4_2 area
+	mov s4_3 ratio
+	lcs tmp STATE
+	lm s5 tmp
+	simd_fsub s4 s4 s5
+
+	// K * y;
+	//float kymat[7] = {
+	//	kmat[0] * ymat[0],
+	//	kmat[1] * ymat[1],
+	//	kmat[2] * ymat[2],
+	//	kmat[3] * ymat[3],
+	//	kmat[4] * ymat[0],
+	//	kmat[5] * ymat[1],
+	//	kmat[6] * ymat[2],
+	//};
+	lcs tmp KMAT_DATA
+	lm_d s5 tmp
+	lm_d s6 tmp 16
+	simd_fmul s5 s5 s4
+	simd_fmul s6 s6 s4
+
+	// X = X + K * y;
+	lcs tmp STATE
+	lm s4 tmp
+	simd_fadd s4 s4 s5
+	sm tmp s4
+
+	nop
+	lm s4 tmp 16
+	simd_fadd s4 s4 s6
+	sm tmp s4 16
+	
+	// time_since_update = 0;
+	sv TIME_SINCE_UPDATE 0
+	nop
+}

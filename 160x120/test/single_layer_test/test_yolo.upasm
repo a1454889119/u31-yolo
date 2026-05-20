@@ -1,0 +1,14 @@
+@import LAYER_64_OUTPUT
+@import LAYER_59_OUTPUT
+@import LAYER_48_OUTPUT
+@import LAYER_43_OUTPUT
+
+$func yolo_reset()
+$func yolo(in input_c40, in input_c2, in width, in height, in scale)
+
+entry:
+	yolo_reset()
+	yolo(LAYER_48_OUTPUT, LAYER_43_OUTPUT, 20, 15, 8)
+	yolo(LAYER_64_OUTPUT, LAYER_59_OUTPUT, 40, 30, 4)
+	hlt
+

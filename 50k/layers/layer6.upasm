@@ -1,0 +1,30 @@
+//---------------LAYER 6(conv)-------------
+//input:44x22x8
+//output:44x22x24
+//k1s1p0,group=1
+//leaky
+// 44x22x8=>44x22x24 1x1卷积, leaky, 输入cwh 输出whc
+#include "layers_common.upinc"
+
+@import conv_k1_i8o24_params
+@import conv_k1_i8o24_whc
+
+@export layer_6
+layer_6:
+	sv layer_rp_adr0 rp
+	//conv_k1_i8o24_params:
+	//.word 0 // wh_x2
+	//.word 0 // input_adr
+	//.word 0 // output_adr
+	//.word 0 // kernel_adr
+	//.word 0 // bias_adr
+	lcs ptr0 conv_k1_i8o24_params
+	sv  ptr0 1936 // 44*22*2
+	svw ptr0 layer_5_output
+	svw ptr0 layer_6_output
+	sw  ptr0 kernel_addr
+	sw  ptr0 bias_addr
+	call conv_k1_i8o24_whc
+
+	lv rp layer_rp_adr0
+	ret

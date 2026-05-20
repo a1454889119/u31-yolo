@@ -1,0 +1,193 @@
+
+#define curr_type s4_0
+#define curr_score s4_1
+#define curr_x s5_2
+#define curr_y s5_3
+#define curr_w s5_0
+#define curr_h s5_1
+
+#define rect_type s6_0
+#define rect_score s6_1
+#define rect_x s7_2
+#define rect_y s7_3
+#define rect_w s7_0
+#define rect_h s7_1
+
+
+.align 16
+@export TargetData
+TargetData:
+.reserve 1280 //8+4*6*32
+
+$func yolo_reset() {
+	reg start_adr
+	lc ptr0 TargetData
+	add start_adr ptr0 8
+	
+	sw ptr0 0
+	sw ptr0 start_adr
+	nop
+}
+
+
+$func check_rect_nmls() {
+	reg count, rect_ptr, rect_end, ignore
+	reg inter_x, inter_y, inter_area, union_area
+	reg t0, t1
+	reg rj_0, rj_1, rj_2, rj_3, rj_4
+	reg next_rj
+
+	lc rect_ptr, TargetData
+	lw count rect_ptr, 0
+	lw rect_end rect_ptr, 4
+	inc rect_ptr 8
+	
+	mov ignore 0
+	lcs next_rj next_rect
+	$jump_regs rj_0 rj_1 rj_2 rj_3 rj_4
+	whileu rect_ptr < rect_end {
+		lm s6 rect_ptr
+		lm s7 rect_ptr 8
+		cjmpne next_rj curr_type rect_type
+
+		add t0 curr_x curr_w
+		add t1 rect_x rect_w
+		min t0 t0 t1
+		max t1 curr_x rect_x
+		sub inter_x t0 t1
+		mov inter_area 0
+		ifs inter_x > 0 {
+			add t0 curr_y curr_h
+			add t1 rect_y rect_h
+			min t0 t0 t1
+			max t1 curr_y rect_y
+			sub inter_y t0 t1
+			ifs inter_y > 0 {
+				muls32 inter_area inter_x inter_y
+			}
+		}
+
+		muls32 t0 curr_w curr_h
+		muls32 union_area rect_w rect_h
+		inc union_area t0
+		sub union_area union_area inter_area
+
+		// if (intersect_area / union_area > 0.4f) 
+		// intersect_area / union_area > 2 / 5
+		// intersect_area * 5 > union_area * 2
+		muls32 inter_area inter_area 5
+		sl union_area union_area 1
+		ifs inter_area > union_area {
+			// 到这里已经确定2个box重叠了.
+			// 下面就是根据得分判断保留哪一个box了.
+			mov ignore 1
+			ifs curr_score > rect_score {
+				sw rect_ptr curr_type 
+				sw rect_ptr curr_score, 4				
+				sw rect_ptr curr_x 16
+				sw rect_ptr curr_y 20
+				sw rect_ptr curr_w 8
+				sw rect_ptr curr_h 12
+			}
+			jmp end_nmls
+		}
+next_rect:
+		inc rect_ptr 24
+	}
+	$jump_regs end
+
+	ifu ignore == 0 {		
+		sw rect_end curr_type
+		sw rect_end curr_score, 4
+		sw rect_end curr_x 16
+		sw rect_end curr_y 20
+		sw rect_end curr_w 8
+		sw rect_end curr_h 12
+		lc rect_ptr, TargetData
+		inc count 1
+		inc rect_end 24
+		sw rect_ptr count
+		sw rect_ptr rect_end, 4
+		nop
+	}
+end_nmls:
+}
+/*
+$func check_rect_nmls(out ignore_box) {
+	reg rect_ptr, rect_end, ignore
+	reg inter_x, inter_y, inter_area
+	reg union_area
+	reg t0, t1
+	reg rj_0, rj_1, rj_2, rj_3, rj_4
+	reg next_rj
+	lc rect_ptr TargetData
+	mov ignore 0
+	lw rect_end rect_ptr, 4
+	inc rect_ptr 8
+
+	lcs next_rj next_rect
+	$jump_regs rj_0 rj_1 rj_2 rj_3 rj_4
+	whileu rect_ptr < rect_end {
+		lm s6 rect_ptr
+		lm s7 rect_ptr 8
+
+		cjmpne next_rj curr_type rect_type
+
+		add t0 curr_x curr_w
+		add t1 rect_x rect_w
+		min t0 t0 t1
+		max t1 curr_x rect_x
+		sub inter_x t0 t1
+
+		mov inter_area 0
+		ifs inter_x > 0 {
+			add t0 curr_y curr_h
+			add t1 rect_y rect_h
+			min t0 t0 t1
+			max t1 curr_y rect_y
+			sub inter_y t0 t1
+			ifs inter_y > 0 {
+				muls32_64 d0 inter_x inter_y
+				srs64 d0 d0 10
+				nop
+				mov inter_area d0_lo				
+			}
+		}
+
+		muls32_64 d0 curr_w curr_h
+		muls32_64 d1 rect_w rect_h
+		add64 d0 d0 d1
+		srs64 d0 d0 10
+		nop
+		mov union_area d0_lo
+		sub union_area union_area inter_area
+
+		// if (intersect_area / union_area > 0.4f) 
+		// intersect_area / union_area > 2 / 5
+		// intersect_area * 5 > union_area * 2
+		muls32 inter_area inter_area 5
+		sl union_area union_area 1
+		ifs inter_area > union_area {
+			// 到这里已经确定2个box重叠了.
+			// 下面就是根据得分判断保留哪一个box了.
+			mov ignore 1
+			ifs curr_score > rect_score {
+				sw rect_ptr curr_type 
+				sw rect_ptr curr_score, 4				
+				sw rect_ptr curr_x 8
+				sw rect_ptr curr_y 12
+				sw rect_ptr curr_w 16
+				sw rect_ptr curr_h 20
+			}
+			jmp end_nmls			
+		}
+next_rect:
+		inc rect_ptr 24
+	}
+	$jump_regs end
+
+end_nmls:
+	set_var ignore_box ignore
+	nop
+}
+*/

@@ -1,0 +1,17 @@
+@import LAYER_29_OUTPUT
+@import LAYER_30_OUTPUT
+@import LAYER_31_OUTPUT
+@import LAYER_32_OUTPUT
+
+
+$func maxpool5_cwh(in input, in outcwh, in width, in height, in channels)
+$func maxpool5_whc_cwh(in input, in outwhc, in outcwh, in width, in height, in channels)
+
+entry:
+	maxpool5_whc_cwh(LAYER_29_OUTPUT, LAYER_30_OUTPUT, test_data, 20, 15, 24)
+	maxpool5_whc_cwh(LAYER_30_OUTPUT, LAYER_31_OUTPUT, test_data, 20, 15, 24)
+	maxpool5_cwh(LAYER_31_OUTPUT, LAYER_32_OUTPUT, 20, 15, 24)
+	hlt
+
+test_data:
+.reserve 14400

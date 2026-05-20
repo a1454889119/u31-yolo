@@ -1,0 +1,50 @@
+
+#define inptr ptr0
+#define outptr0 ptr1
+#define outptr1 ptr2
+
+$func upsample_whc(in input, in output, in width, in height, in channels) {
+	reg i, j, k, nk, w, h, c, w4
+	reg rj0, rj1, tmp
+	lcs i 0
+	load_reg inptr input
+	load_reg outptr0 output
+	load_reg w width
+	load_reg h height
+	load_reg c channels
+	sl w4 w 2
+	add outptr1 outptr0 w4
+
+	srs nk w 2 // nk = w / 4
+
+	$jump_regs rj0 rj1
+	whileu i < c {
+		lcs j 0
+		whileu j < h {
+
+			lcs k 0
+			whileu k < nk {
+				l64_d d0 inptr
+				simd_unpack16 s0 d0 d0
+				sm outptr0 s0
+				sm outptr1 s0
+				inc k 1
+			}
+			sl k k 2
+			whileu k < w {
+				lsl tmp inptr
+				ssl outptr0 tmp
+				ssl outptr0 tmp
+				ssl outptr1 tmp
+				ssl outptr1 tmp
+				inc k 1
+			}
+
+			inc outptr0 w4
+			inc outptr1 w4
+			inc j 1
+		}
+		inc i 1
+	}
+	$jump_regs end
+}

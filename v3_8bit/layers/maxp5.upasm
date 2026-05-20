@@ -1,0 +1,189 @@
+#include layer_param.upinc
+#include yolo_funcs.upinc // for SAVE_WHC/SAVE_CWH/SAVE_WHC_CWH
+#include layer_regs.upinc
+
+#define outptr_cwh outptr
+#define outptr_whc ptr1
+#define i r18
+#define j r19
+#define rj0 r20
+#define rj1 r21
+#define maxv r22
+
+#define wxh outwxh
+#define outs outstride
+
+@export maxpool5_40x20x24
+maxpool5_40x20x24:
+	//设置ptr0偏移值为outs
+	lcs j 0x10000
+	or i outs j
+	svw 0x09000058, i
+
+	svw 0x0900040c 0x00000000
+	svw 0x09000414 0x01552200
+	svw 0x09000418 0x00280014
+	svw 0x0900041C 0x00000000
+	svw 0x09000420 0x00000320
+	svw 0x09000424 0x50000028
+
+	lcs wxh, 40*20
+	ifu saveFlag == SAVE_CWH {
+		$jump_regs rj0 rj1
+		lcs i 0
+		whileu i < 24 {
+			svw 0x0900042C inadr
+			mov outptr_cwh outadr
+			lcs j 0
+			whileu j < wxh {
+				wait_wnd
+				simd_max16_8 s4_0 s8
+				simd_max16_8 s4_1 s9
+				simd_max16_8 s4_2 s10
+				rd16l s4_3 s11 0
+				img_data_rd
+	
+				max maxv s4_0 s4_1
+				max maxv maxv s4_2
+				max maxv maxv s4_3
+				sbyte outptr_cwh maxv
+				//sbyte outptr_whc maxv
+				inc j 1
+	
+			}
+			inc outadr 1
+			inc inadr wxh
+			inc i 1
+		}
+		$jump_regs end
+	
+	} else {
+		// save_func == SAVE_WHC_CWH
+		mov outptr_whc outadr2
+		$jump_regs rj0 rj1
+		lcs i 0
+		whileu i < 24 {
+			svw 0x0900042C inadr
+			mov outptr_cwh outadr
+			lcs j 0
+			whileu j < wxh {
+				wait_wnd
+				simd_max16_8 s4_0 s8
+				simd_max16_8 s4_1 s9
+				simd_max16_8 s4_2 s10
+				rd16l s4_3 s11 0
+				img_data_rd
+	
+				max maxv s4_0 s4_1
+				max maxv maxv s4_2
+				max maxv maxv s4_3
+				sbyte outptr_cwh maxv
+				sbyte outptr_whc maxv
+				inc j 1
+	
+			}
+			inc outadr 1
+			inc inadr wxh
+			inc i 1
+		}
+		$jump_regs end
+
+	}
+
+	svw 0x09000058, 0
+
+	ret
+
+/*
+#define outptr_cwh ptr0
+#define outptr_whc ptr1
+$func maxpool5_40x20x24(in outtype) {
+	reg inadr, outadr, i, j, wxh, outs
+	reg rj0, rj1
+	reg param_ptr(rj0), save_func(rj1), maxv(outs)
+
+	lc param_ptr, LAYER_PARAM_ADDR
+	lw inadr param_ptr, INPUT_ADDR_OFF
+	lw outadr param_ptr, OUTPUT_ADDR_OFF
+	lw outptr_whc param_ptr, OUTPUT_ADDR2_OFF
+	lw outs param_ptr, OUT_STRIDE_OFF
+
+	//设置ptr0偏移值为outs
+	lcs j 0x10000
+	or i outs j
+	svw 0x09000058, i
+
+	svw 0x0900040c 0x00000000
+	svw 0x09000414 0x01552200
+	svw 0x09000418 0x00280014
+	svw 0x0900041C 0x00000000
+	svw 0x09000420 0x00000320
+	svw 0x09000424 0x50000028
+
+	lcs wxh, 40*20
+	load_reg save_func outtype
+	ifu save_func == SAVE_CWH {
+		$jump_regs rj0 rj1
+		lcs i 0
+		whileu i < 24 {
+			svw 0x0900042C inadr
+			mov outptr_cwh outadr
+			lcs j 0
+			whileu j < wxh {
+				wait_wnd
+				simd_max16_8 s4_0 s8
+				simd_max16_8 s4_1 s9
+				simd_max16_8 s4_2 s10
+				rd16l s4_3 s11 0
+				img_data_rd
+	
+				max maxv s4_0 s4_1
+				max maxv maxv s4_2
+				max maxv maxv s4_3
+				sbyte outptr_cwh maxv
+				//sbyte outptr_whc maxv
+				inc j 1
+	
+			}
+			inc outadr 1
+			inc inadr wxh
+			inc i 1
+		}
+		$jump_regs end
+	
+	} else {
+		// save_func == SAVE_WHC_CWH
+		$jump_regs rj0 rj1
+		lcs i 0
+		whileu i < 24 {
+			svw 0x0900042C inadr
+			mov outptr_cwh outadr
+			lcs j 0
+			whileu j < wxh {
+				wait_wnd
+				simd_max16_8 s4_0 s8
+				simd_max16_8 s4_1 s9
+				simd_max16_8 s4_2 s10
+				rd16l s4_3 s11 0
+				img_data_rd
+	
+				max maxv s4_0 s4_1
+				max maxv maxv s4_2
+				max maxv maxv s4_3
+				sbyte outptr_cwh maxv
+				sbyte outptr_whc maxv
+				inc j 1
+	
+			}
+			inc outadr 1
+			inc inadr wxh
+			inc i 1
+		}
+		$jump_regs end
+
+	}
+
+	svw 0x09000058, 0
+	nop
+}
+*/

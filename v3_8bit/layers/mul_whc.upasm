@@ -1,0 +1,171 @@
+#include layer_param.upinc
+#include yolo_funcs.upinc
+#include layer_regs.upinc
+#define b_03 s4
+#define b_47 s5
+#define b0 s4_0
+#define b4 s5_0
+
+
+#define ktmp s3
+#define kscale s14
+#define kzero_point s15
+
+
+//#define outptr ptr0
+#define inptr0 ptr1
+#define inptr1 ptr2
+
+#define c r19
+#define rj0 r20
+#define rj1 r21
+#define i r22
+#define j r23
+#define v r24
+#define wxh outwxh
+
+#define process_8 \
+	simd_muls16 s0 s6_01 s7_01; \
+	simd_linear d0 s0 mulshift; \
+	s64 outptr d0; \
+	simd_muls16 s1 s6_23 s7_23; \
+	lm_d s6 inptr0; \
+	simd_linear d0 s1 mulshift; \
+	s64 outptr d0;
+
+@export mul_whc
+mul_whc:
+	mov outptr outadr
+	mov inptr0 inadr
+	mov inptr1 inadr2
+	simd_ext32 kscale layer_scale
+	simd_ext32 kzero_point layer_zeropt
+
+	lcs d2_lo 0xc840
+	lcs c 24
+	ifu sizeFlag == SIZE_20X10X24 {
+		lcs wxh, 20*10
+	} else {
+		ifu sizeFlag == SIZE_40X20X24 {
+			lcs wxh, 40*20
+		} else {
+			lcs wxh, 80*40
+		}
+	}
+
+	$jump_regs rj0, rj1
+	lcs i 0
+	whileu i < c {
+		lsl v inptr1
+		simd_ext16 s7 v 0
+
+		lcs j 0
+		whileu j < wxh {
+			lm_d s6 inptr0
+			inc j 8
+	
+			simd_muls16 b_03 s6_01 s7_01
+			simd_muls16 b_47 s6_23 s7_01
+	
+			simd_linear d1 b_03 layer_mulshift
+			simd_16to32 b_03 d1
+			simd_i32f32 b_03 b_03 31
+			simd_fmul b_03 b_03 kscale
+			simd_fsub b_03 b_03 kzero_point
+			simd_f32i32 ktmp b_03 30
+			simd_f32i32 b_03 b_03 31
+			simd_sub32 b_03 ktmp b_03
+	
+			simd_linear d1 b_47 layer_mulshift
+			simd_16to32 b_47 d1
+			simd_i32f32 b_47 b_47 31
+			simd_fmul b_47 b_47 kscale
+			simd_fsub b_47 b_47 kzero_point
+			simd_f32i32 ktmp b_47 30
+			simd_f32i32 b_47 b_47 31
+			simd_sub32 b_47 ktmp b_47
+	
+			simd_shuffle8 b_03 b_03 d2
+			simd_shuffle8 b_47 b_47 d2
+			sw outptr b0
+			sw outptr b4	
+		}
+		
+		inc i 1
+	}
+	$jump_regs end
+	ret
+
+	
+/*	
+$func mul_whc(in sizetype) {
+	reg i, j, c, v, 
+	reg rj0, rj1, mulshift, wxh
+	reg param_ptr(rj0)
+
+	lc param_ptr, LAYER_PARAM_ADDR
+	lw inptr0 param_ptr, INPUT_ADDR_OFF
+	lw outptr param_ptr, OUTPUT_ADDR_OFF
+	lw inptr1 param_ptr, INPUT_ADDR2_OFF
+	lw mulshift param_ptr, MUL_SHIFT_OFF
+	lw i param_ptr, SCALE_OFF
+	lw v param_ptr, ZERO_POINT_OFF
+	simd_ext32 kscale i
+	simd_ext32 kzero_point v
+
+	lcs d2_lo 0xc840
+	lcs c 24
+	load_reg i sizetype
+	ifu i == SIZE_20X10X24 {
+		lcs wxh, 20*10
+	} else {
+		ifu i == SIZE_40X20X24 {
+			lcs wxh, 40*20
+		} else {
+			lcs wxh, 80*40
+		}
+	}
+
+	$jump_regs rj0, rj1
+	lcs i 0
+	whileu i < c {
+		lsl v inptr1
+		simd_ext16 s7 v 0
+
+		lcs j 0
+		whileu j < wxh {
+			lm_d s6 inptr0
+			inc j 8
+	
+			simd_muls16 b_03 s6_01 s7_01
+			simd_muls16 b_47 s6_23 s7_01
+	
+			simd_linear d1 b_03 mulshift
+			simd_16to32 b_03 d1
+			simd_i32f32 b_03 b_03 31
+			simd_fmul b_03 b_03 kscale
+			simd_fsub b_03 b_03 kzero_point
+			simd_f32i32 ktmp b_03 30
+			simd_f32i32 b_03 b_03 31
+			simd_sub32 b_03 ktmp b_03
+	
+			simd_linear d1 b_47 mulshift
+			simd_16to32 b_47 d1
+			simd_i32f32 b_47 b_47 31
+			simd_fmul b_47 b_47 kscale
+			simd_fsub b_47 b_47 kzero_point
+			simd_f32i32 ktmp b_47 30
+			simd_f32i32 b_47 b_47 31
+			simd_sub32 b_47 ktmp b_47
+	
+			simd_shuffle8 b_03 b_03 d2
+			simd_shuffle8 b_47 b_47 d2
+			sw outptr b0
+			sw outptr b4	
+		}
+		
+		inc i 1
+	}
+	$jump_regs end
+}
+*/

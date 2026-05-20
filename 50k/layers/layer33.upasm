@@ -1,0 +1,114 @@
+//---------------LAYER 33(conv)-------------
+//input:22x11x48
+//output:22x11x40
+//k1s1p0,group=1
+//leaky
+// output: whc
+#include "layers_common.upinc"
+
+#define in0 s0
+
+#define k0_0 s1
+#define k0_1 s2
+#define k0_2 s3
+#define k0_3 s4
+#define k0_4 s5
+#define k0_5 s6
+
+#define k1_0 s7
+#define k1_1 s8
+#define k1_2 s9
+#define k1_3 s10
+#define k1_4 s11
+#define k1_5 s12
+
+#define b0 r5
+#define b1 r6
+#define wh_x2 r7
+#define wh_x4 r8
+#define output_ptr r9
+
+#define input_end r16
+#define input_start r17
+#define bias_ptr r18
+#define i r19
+
+#define input_ptr ptr0
+#define kernel_ptr ptr1
+
+@export layer_33
+layer_33:
+	lcs wh_x2 484 // 22*11
+	lcs wh_x4 968 // 22*11*4
+	lcs input_end LAYER_33_INPUT_SIZE
+	lcs input_start layer_31_output
+	inc input_end input_start	
+	lcs output_ptr layer_33_output
+
+	mov bias_ptr bias_addr
+	mov kernel_ptr kernel_addr
+	lcs i 0
+	$jump_regs r20 ...
+	// 20轮, 每轮得到2个输出通道
+	whileu i < 20 {
+		lm k0_0 kernel_ptr
+		lm k0_1 kernel_ptr
+		lm k0_2 kernel_ptr
+		lm k0_3 kernel_ptr
+		lm k0_4 kernel_ptr
+		lm k0_5 kernel_ptr
+
+		lm k1_0 kernel_ptr
+		lm k1_1 kernel_ptr
+		lm k1_2 kernel_ptr
+		lm k1_3 kernel_ptr
+		lm k1_4 kernel_ptr
+		lm k1_5 kernel_ptr
+
+		mov input_ptr input_start
+		whileu input_ptr < input_end {
+			lw b0 bias_ptr
+			lw b1 bias_ptr 4
+			lm in0 input_ptr
+			simd_mac16_8 b0 k0_0 in0
+			simd_mac16_8 b1 k1_0 in0
+			nop
+
+			lm in0 input_ptr
+			simd_mac16_8 b0 k0_1 in0
+			simd_mac16_8 b1 k1_1 in0
+			nop
+
+			lm in0 input_ptr
+			simd_mac16_8 b0 k0_2 in0
+			simd_mac16_8 b1 k1_2 in0
+			nop
+
+			lm in0 input_ptr
+			simd_mac16_8 b0 k0_3 in0
+			simd_mac16_8 b1 k1_3 in0
+			nop
+
+			lm in0 input_ptr
+			simd_mac16_8 b0 k0_4 in0
+			simd_mac16_8 b1 k1_4 in0
+			nop
+
+			lm in0 input_ptr
+			simd_mac16_8 b0 k0_5 in0
+			simd_mac16_8 b1 k1_5 in0
+			nop
+			nop
+
+			leaky b0 b0 10
+			leaky b1 b1 10
+
+			ssl output_ptr b0
+			ssl output_ptr b1 wh_x2
+			inc output_ptr 2
+		}
+		inc output_ptr wh_x2
+		inc bias_ptr 8
+		inc i 1
+	}
+	ret

@@ -1,0 +1,152 @@
+
+#define wh_x2 r0
+#define wh_x4 r1
+#define wh_x6 r2
+#define wh_x8 r3
+#define wh_x10 r4
+#define wh_x12 r5
+#define wh_x14 r6
+#define wh_x16 r7
+#define wh_x18 r8
+#define wh_x20 r9
+#define wh_x22 r10
+#define input_end r11
+#define input_start r12
+#define bias_ptr r13
+#define i r14
+#define output_ptr r15
+#define output_start r16
+
+#define k0 s1
+#define k1 s2
+#define k2 s3
+#define k3 s8
+#define k4 s9
+#define k5 s10
+#define k6 s11
+#define k7 s0
+#define k8 s12
+#define k9 s13
+#define k10 s14
+#define k11 s15
+
+#define in s6
+
+#define br0 s4
+#define br1 s5
+#define br0_0 s4_0
+#define br0_1 s4_1
+#define br0_2 s4_2
+#define br0_3 s4_3
+#define br1_0 s5_0
+#define br1_1 s5_1
+#define br1_2 s5_2
+#define br1_3 s5_3
+
+#define input_ptr ptr0
+#define kernel_ptr ptr1
+
+#export conv_k1_i8o24_params
+conv_k1_i8o24_params:
+.word 0 // wh_x2
+.word 0 // input_adr
+.word 0 // output_adr
+.word 0 // kernel_adr
+.word 0 // bias_adr
+
+#export conv_k1_i8o24_whc
+conv_k1_i8o24_whc:
+	lcs ptr2 conv_k1_i8o24_params
+	nop
+	lw wh_x2 ptr2
+	lw input_ptr ptr2
+	lw output_ptr ptr2
+	lw kernel_ptr ptr2
+	lw bias_ptr ptr2
+
+	sl wh_x4 wh_x2 1
+	sl wh_x8 wh_x2 2
+	sl wh_x16 wh_x2 3
+	add wh_x6 wh_x2 wh_x4
+	add wh_x10 wh_x2 wh_x8
+	add wh_x12 wh_x2 wh_x10
+	add wh_x14 wh_x2 wh_x12
+	add wh_x18 wh_x6 wh_x12
+	add wh_x20 wh_x8 wh_x12
+	add wh_x22 wh_x8 wh_x14
+
+	mov output_start output_ptr
+	mov input_start input_ptr
+	// input_end = input_start + wh*16
+	add input_end input_start wh_x16
+
+	lcs i 0
+	#jump-regs r20 r21 ...
+	// 2轮, 每轮得到12个输出通道
+	whileu i < 2 {
+		lm k0  kernel_ptr
+		lm k1  kernel_ptr
+		lm k2  kernel_ptr
+		lm k3  kernel_ptr
+		lm k4  kernel_ptr
+		lm k5  kernel_ptr
+		lm k6  kernel_ptr
+		lm k7  kernel_ptr
+		lm k8  kernel_ptr
+		lm k9  kernel_ptr
+		lm k10 kernel_ptr
+		lm k11 kernel_ptr
+
+		mov input_ptr input_start
+		mov output_ptr output_start
+		whileu input_ptr < input_end {
+			lm in input_ptr
+
+			lm br0 bias_ptr
+			lm br1 bias_ptr 16
+
+			simd_muladd br0_0 k0 in
+			simd_muladd br0_1 k1 in
+			simd_muladd br0_2 k2 in
+			simd_muladd br0_3 k3 in
+			simd_muladd br1_0 k4 in
+			simd_muladd br1_1 k5 in
+			simd_muladd br1_2 k6 in
+			simd_muladd br1_3 k7 in
+
+			simd_leaky d0 br0 10
+			lm br0 bias_ptr 32
+
+			ssu output_ptr d0_lo 0
+			ss  output_ptr d0_lo wh_x2
+			ssu output_ptr d0_hi wh_x4
+			ss  output_ptr d0_hi wh_x6
+
+			simd_leaky d1 br1 10
+
+
+			simd_muladd br0_0 k8 in
+			simd_muladd br0_1 k9 in
+			simd_muladd br0_2 k10 in
+			simd_muladd br0_3 k11 in
+
+			ssu output_ptr d1_lo wh_x8
+			ss  output_ptr d1_lo wh_x10
+			ssu output_ptr d1_hi wh_x12
+
+			simd_leaky d0 br0 10			
+			ss  output_ptr d1_hi wh_x14
+
+			ssu output_ptr d0_lo wh_x16
+			ss  output_ptr d0_lo wh_x18
+			ssu output_ptr d0_hi wh_x20
+			ss  output_ptr d0_hi wh_x22
+
+			inc output_ptr 2
+		}
+		add output_start output_ptr wh_x22
+		inc bias_ptr 48
+		inc i 1
+	}
+	#jump-regs end
+	ret

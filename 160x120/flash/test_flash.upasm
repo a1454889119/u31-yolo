@@ -1,0 +1,32 @@
+#include yolo_funcs.upinc
+#include flash_memory.upinc
+#include flash_weights.upinc
+#include layer_memory.upinc
+@import IMAGE_INPUT_ADDR0
+@import MEMORY
+$func yolo_run(in image_adr)
+$func read_flash_nowait(in flash_addr, in ram_addr, in length)
+
+entry:
+
+	svw 0x09000038, 0x00ff8800
+	svw 0x09000000, 0x13024454 //pll1=242Mhz, pll2=40Mhz
+	svw 0x09000008, 0x400063   //flash=PLL2; music_clk=PLL2; sencor_clk=PLL2
+
+
+
+loop:
+	svw 0x09000040 3
+
+	//read_flash_nowait(LAYER_34_WEIGHT_FLASH_ADDR, LAYER_34_KERNEL_ADDR, 11224)
+	//wait_flash
+	//lc r0, LAYER_35_KERNEL_ADDR
+	//read_flash_nowait(0x44000, MEMORY, 72*1024)
+	//wait_flash
+	yolo_run(IMAGE_INPUT_ADDR0)
+
+	lvw r0 0x09000040
+
+	jmp loop
+
+	hlt

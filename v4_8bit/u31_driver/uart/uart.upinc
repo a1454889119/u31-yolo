@@ -1,0 +1,8 @@
+// #include "project.upinc"
+
+@import UART_TMP_BUF
+$func enable_uart_irq()
+$func uart0_rx_data(in addr, in len)
+$func uart0_tx_data_block(in addr, in len)
+// $func get_spi_onoff(out onoff)
+

@@ -1,0 +1,57 @@
+
+#define src_ptr ptr0 
+#define dst_ptr ptr1 
+
+$func extend_120x160_to_128x160(in input, in output) {
+	reg i, h
+	lcs h 160
+	load_reg src_ptr input
+	load_reg dst_ptr output
+
+	lcs i 0
+	whileu i < h {
+		lm_d s4 src_ptr
+		lm_d s5 src_ptr
+		lm_d s6 src_ptr
+		lm_d s7 src_ptr
+		sw dst_ptr 0
+		sw dst_ptr s4_0
+		sw dst_ptr s4_1
+		sw dst_ptr s4_2
+		sw dst_ptr s4_3
+		sw dst_ptr s5_0
+		sw dst_ptr s5_1
+		sw dst_ptr s5_2
+		sw dst_ptr s5_3
+		sw dst_ptr s6_0
+		sw dst_ptr s6_1
+		sw dst_ptr s6_2
+		sw dst_ptr s6_3
+		sw dst_ptr s7_0
+		sw dst_ptr s7_1
+		sw dst_ptr s7_2
+		sw dst_ptr s7_3
+		inc i 1
+
+		lm_d s4 src_ptr
+		lm_d s5 src_ptr
+		lm_d s6 src_ptr
+		l64_d s7_01 src_ptr
+		sw dst_ptr s4_0
+		sw dst_ptr s4_1
+		sw dst_ptr s4_2
+		sw dst_ptr s4_3
+		sw dst_ptr s5_0
+		sw dst_ptr s5_1
+		sw dst_ptr s5_2
+		sw dst_ptr s5_3
+		sw dst_ptr s6_0
+		sw dst_ptr s6_1
+		sw dst_ptr s6_2
+		sw dst_ptr s6_3
+		sw dst_ptr s7_0
+		sw dst_ptr s7_1
+		sw dst_ptr 0
+		
+	}
+}

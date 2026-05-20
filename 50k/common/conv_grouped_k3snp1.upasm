@@ -1,0 +1,119 @@
+#include "param_addr.upinc"
+
+@export conv_params
+conv_params:
+.word 0 // VDMA1_PARAM0
+.word 0 // VDMA1_PARAM1
+.word 0 // VDMA1_PARAM2
+.word 0 // VDMA1_PARAM3
+.word 0 // input_wh_x2
+.word 0 // output_whc_x2
+.word 0 // c
+.word 0 // input_adr
+.word 0 // output_adr
+.word 0 // kernel_adr
+.word 0 // bias_adr
+
+#define input_wh_x2 r3
+#define output_whc_x2 r4
+#define c r5
+#define input_ptr r6
+#define output_ptr r7
+
+#define output_channel_ptr r8
+#define i r9
+#define bias_v r10
+#define res r11
+#define output_ptr_end r12
+#define output_stride r13
+#define neg_stride r14
+
+
+#define tmp r15
+
+#define kernel_ptr ptr1
+#define bias_ptr ptr2
+
+#define k0 s0
+#define k1 s1
+
+#define in_0 s8
+#define in_1 s9
+
+@export conv_grouped_k3snp1
+conv_grouped_k3snp1:
+
+	lcs ptr0 conv_params
+	nop
+	
+	lw r0 ptr0
+	lw r1 ptr0
+	lw r2 ptr0
+	lw r3 ptr0
+
+	sv VDMA1_ADDR_0 r0
+	sv VDMA1_ADDR_1 r1
+	sv VDMA1_ADDR_2 r2
+	sv VDMA1_ADDR_3 r3
+	nop
+
+	lw input_wh_x2 ptr0
+	lw output_whc_x2 ptr0
+	lw c ptr0
+	lw input_ptr ptr0
+	lw output_ptr ptr0
+	lw kernel_ptr ptr0
+	lw bias_ptr ptr0
+
+	sl output_stride c 1
+	neg neg_stride output_stride
+	mov output_channel_ptr output_ptr
+
+	lcs i 0
+	$jump_regs r30 r31 ...
+	whileu i < c {
+		mov output_ptr output_channel_ptr
+
+		// 初始化窗口读取
+		sv VDMA1_ADDR_4 input_ptr
+		add output_ptr_end output_ptr output_whc_x2
+
+		// 读取偏移量和卷积核
+		lw bias_v bias_ptr
+		lm k0 kernel_ptr
+		lm k1 kernel_ptr
+		whileu output_ptr < output_ptr_end {
+			hlt 17	// 等待窗口数据
+
+			mov res bias_v
+			//mov res 0
+			simd_mac16_8 res in_0 k0
+			nop
+			nop
+			nop
+			simd_mac16_8 res in_1 k1
+			nop
+			
+			img_data_rd // 移动窗口
+
+			inc output_ptr output_stride
+			
+			//add tmp res bias_v
+			leaky res res 10
+
+//			// 对比结果
+//			lsl tmp output_ptr neg_stride
+//			ifs tmp != res {
+//				nop
+//			}
+
+			ssl output_ptr res neg_stride
+		}
+
+		inc input_ptr input_wh_x2
+		inc output_channel_ptr 2
+		inc i 1
+	}
+	$jump_regs end
+
+	ret

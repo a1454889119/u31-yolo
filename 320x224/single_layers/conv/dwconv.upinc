@@ -1,0 +1,14 @@
+
+
+#define dwconv_out_w r0
+#define dwconv_out_h r1
+#define dwconv_in_w r2
+#define dwconv_in_h r3
+#define dwconv_c r4
+#define dwconv_in_adr r5
+#define dwconv_out_adr r6
+#define dwconv_bias_adr r7
+#define dwconv_kernel_adr r8
+
+@import dwconv3
+@import dwconv5

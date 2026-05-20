@@ -1,0 +1,69 @@
+//---------------LAYER 31(maxpool)-------------
+//input:44x22x24
+//output:22x11x24
+//k4s2p1
+// output:cwh
+
+#include "window_param.upinc"
+
+@import layer_19_input
+@import layer_33_input
+
+#define in_0 s8
+#define in_1 s9
+
+
+#define i r0
+#define input_ptr r1
+#define output_ptr r2
+#define output_end r3
+#define output_channel_ptr r4
+#define input_wh_x2 r5
+#define output_whc_x2 r6
+#define t0 r7
+#define t1 r8
+#define output_stride r9
+
+layer_31:
+	lc input_ptr layer_19_input
+	lcs output_ptr layer_33_input
+	mov output_channel_ptr output_ptr
+	lcs input_wh_x2 1936 	// 44*22*2 
+	lc output_whc_x2 11616 	// 22*11*24*2
+	lcs output_stride 96
+	bit_set r91, r91, 31
+	svw VDMA1_ADDR_0 VDMA1_PARAM_0
+	svw VDMA1_ADDR_1 VDMA1_PARAM_1
+	svw VDMA1_ADDR_2 VDMA1_PARAM_2
+	svw VDMA1_ADDR_3 VDMA1_PARAM_3
+	svw VDMA1_PADDING_ADDR 0x8000
+	lcs i 0
+	$jump_regs r20 r21 ...
+	whileu i < 48 {
+		sv VDMA1_ADDR_4 input_ptr // 设置窗口输入地址
+		mov output_ptr output_channel_ptr
+		add output_end output_channel_ptr output_whc_x2
+		whileu output_ptr < output_end {
+			hlt 17 // 等待窗口数据
+
+			simd_max16 t0 in_0
+			simd_max16 t1 in_1
+			
+			max t0 t0 t1
+			//lsl t1 output_ptr
+			//ifs t0 != t1 {
+			//	nop
+			//}
+			img_data_rd	// 读取下一个窗口
+
+			ssl output_ptr t0
+			inc output_ptr output_stride
+		}
+		inc output_channel_ptr 2
+		inc input_ptr input_wh_x2
+		inc i 2
+	}
+	$jump_regs end
+
+	sv VDMA1_PADDING_ADDR 0
+	ret

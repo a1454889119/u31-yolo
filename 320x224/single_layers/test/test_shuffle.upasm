@@ -1,0 +1,132 @@
+#define VDMA1_ADDR_0 0x09000414
+#define VDMA1_ADDR_1 0x09000418
+#define VDMA1_ADDR_2 0x0900041c
+#define VDMA1_ADDR_3 0x09000420
+#define VDMA1_ADDR_4 0x09000424
+#define VDMA1_ADDR_SRC 0x0900042c
+#define VDMA1_ADDR_DST 0x09000428
+
+
+#define w r0
+#define h r1
+#define data_adr r2
+#define end_adr r3
+#define tmp_data_size r4
+#define ptr_end r5
+#define ptr_start r6
+#define load_dst r7
+#define load_src r8
+#define i r9
+#define read_ptr ptr0
+#define save_ptr r10
+
+tmp_data1:
+.reserve 80*60*2
+tmp_data2:
+.reserve 80*60*2
+
+
+entry:
+
+	lcs w 80
+	lcs h 60
+	lcs data_adr 0
+	lc 	end_adr 230400
+	lcs tmp_data_size, 80*60*2
+	lcs ptr_start tmp_data1
+	mov load_src data_adr
+	lcs load_dst tmp_data1
+	add ptr_end ptr_start tmp_data_size
+	call load_vdma
+	
+	lcs i 0
+	$jump_regs r20 r21 r22 r23 r24 r25
+	whileu i < 24 {
+		mov read_ptr ptr_start
+		add ptr_end ptr_start tmp_data_size
+
+		wait_vdma1
+		ifu i != 23 {
+			lcs load_dst tmp_data1
+			ifu i neb 0 {
+				lcs load_dst tmp_data2
+			}
+			call load_vdma
+		}
+
+		whileu read_ptr < ptr_end {
+			mov save_ptr read_ptr
+			lm_d s0 read_ptr
+			lm_d s1 read_ptr
+			lm_d s2 read_ptr
+
+			simd_shuffle128 s6 s0
+			simd_shuffle128 s7 s1
+
+			s64 save_ptr s6_01 0
+			s64 save_ptr s7_01 8
+	
+			s64 save_ptr s6_23 24
+			s64 save_ptr s7_23 32
+	
+			simd_shuffle128 s6 s2
+			nop
+			s64 save_ptr s6_01 16
+			s64 save_ptr s6_23 40
+		}
+
+		ifu data_adr > 0 {
+			wait_psram
+		}
+		call write_psram
+
+
+		lcs ptr_start tmp_data1
+		ifu i neb 0 {
+			lcs ptr_start tmp_data2
+		}
+
+		inc i 1
+	}
+	$jump_regs end
+
+
+	hlt
+
+
+load_vdma:
+#var LOAD_PARAM_0 0
+#set_bits LOAD_PARAM_0 29 29 1 		// 从PSRAM读取数据
+#set_bits LOAD_PARAM_0 26 24 2 		// 2:16bit
+#set_bits LOAD_PARAM_0 23 20 1 		// VDMA1卷积核宽 	图像copy和二值化及映射一行图像时必须为1
+#set_bits LOAD_PARAM_0 19 16 1 		// VDMA1卷积核高    图像copy和二值化及映射一行图像时必须为1
+
+#var LOAD_PARAM_1 0
+#set_bits LOAD_PARAM_1 28 16 80
+#set_bits LOAD_PARAM_1 11  0 60
+
+#var LOAD_PARAM_2 1024
+#var LOAD_PARAM_3 9600 // 80*60*2
+
+#var LOAD_PARAM_4 0
+#set_bits LOAD_PARAM_4 31 28 0 		// 0 VDMA1复制PSRAM/RAM内的数存到RAM
+#set_bits LOAD_PARAM_4 14  0 160 	// VDMA1读取图像时为原图一行的字节数(宽*像素字节数)
+	svw VDMA1_ADDR_0 LOAD_PARAM_0
+	svw VDMA1_ADDR_1 LOAD_PARAM_1
+	svw VDMA1_ADDR_2 LOAD_PARAM_2
+	svw VDMA1_ADDR_3 LOAD_PARAM_3
+	svw VDMA1_ADDR_4 LOAD_PARAM_4
+	sv  VDMA1_ADDR_SRC load_src
+	sv  VDMA1_ADDR_DST load_dst
+	ret
+
+write_psram:
+
+#var PSRAM_WRITE_CODE 0
+#set_bits PSRAM_WRITE_CODE 31 24 0x80
+#set_bits PSRAM_WRITE_CODE 23 23 1
+#set_bits PSRAM_WRITE_CODE 15  0 9600
+	
+
+
+	ret

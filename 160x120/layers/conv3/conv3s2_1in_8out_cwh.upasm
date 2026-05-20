@@ -1,0 +1,112 @@
+
+$func conv3s2_1in_8out_cwh(in input, in output, in kernels, in width_x_height) {
+#define kptr ptr0
+#define outptr ptr1
+
+#define k0_0 s0
+#define k0_1 s1
+#define k1_0 s2
+#define k1_1 s3
+#define k2_0 s6
+#define k2_1 s7
+#define k3_0 s10
+#define k3_1 s11
+#define k4_0 s12
+#define k4_1 s13
+#define kn_0 s14
+#define kn_1 s15
+#define b_03 s4
+#define b_47 s5
+#define b0 s4_0
+#define b1 s4_1
+#define b2 s4_2
+#define b3 s4_3
+#define b4 s5_0
+#define b5 s5_1
+#define b6 s5_2
+#define b7 s5_3
+
+	reg inadr, outadr, wxh, kadr, badr, i, rj0
+	nop
+	load_reg inadr input
+	load_reg outptr output
+	load_reg kptr kernels
+	load_reg wxh width_x_height
+	
+	lm_d k0_0 kptr
+	lm_d k0_1 kptr
+	lm_d k1_0 kptr
+	lm_d k1_1 kptr
+	lm_d k2_0 kptr
+	lm_d k2_1 kptr
+	lm_d k3_0 kptr
+	lm_d k3_1 kptr
+	lm_d k4_0 kptr
+	lm_d k4_1 kptr
+	mov kadr kptr
+	// 计算偏移量地址
+	lcs badr 96 // 32*3
+	inc badr, kadr
+#if 1
+	// 160x128
+	svw 0x0900040c 0x00000000
+	svw 0x09000414 0x01331101
+	svw 0x09000418 0x00500040
+	svw 0x0900041C 0x00000000
+	svw 0x09000420 0x00004B00
+	svw 0x09000424 0x500000A0
+#else
+	// 128x160
+	svw 0x0900040c 0x00000000
+	svw 0x09000414 0x01331101
+	svw 0x09000418 0x00400050
+	svw 0x0900041C 0x00000000
+	svw 0x09000420 0x00005000
+	svw 0x09000424 0x50000080
+#endif
+	svw 0x0900042C inadr
+
+	lcs i 0
+	$jump_regs rj0
+	whileu i < wxh {
+		mov kptr kadr
+		lm_d b_03 badr
+		lm_d b_47 badr, 16
+		wait_wnd // 等待窗口读取完成
+		simd_mac16_8 b0 k0_0 s8
+		simd_mac16_8 b1 k1_0 s8
+		simd_mac16_8 b2 k2_0 s8
+		simd_mac16_8 b3 k3_0 s8
+		simd_mac16_8 b4 k4_0 s8
+		simd_mac16_8 b0 k0_1 s9
+		simd_mac16_8 b1 k1_1 s9
+		simd_mac16_8 b2 k2_1 s9
+		simd_mac16_8 b3 k3_1 s9
+		simd_mac16_8 b4 k4_1 s9
+
+		lm_d kn_0 kptr
+		simd_mac16_8 b5 kn_0 s8
+		lm_d kn_1 kptr
+		simd_mac16_8 b5 kn_1 s9
+
+		lm_d kn_0 kptr
+		simd_mac16_8 b6 kn_0 s8
+		lm_d kn_1 kptr
+		simd_mac16_8 b6 kn_1 s9
+
+		lm_d kn_0 kptr
+		simd_mac16_8 b7 kn_0 s8
+		lm_d kn_1 kptr
+		simd_mac16_8 b7 kn_1 s9
+
+		img_data_rd	// 读取下一个窗口
+
+		simd_leaky d0 b_03 8
+		simd_leaky d1 b_47 8
+		s64 outptr d0
+		s64 outptr d1
+
+		inc i 1
+	}
+	$jump_regs end
+}

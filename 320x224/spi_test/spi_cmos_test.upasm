@@ -1,0 +1,133 @@
+
+#define PSRAM_64M 0
+
+#if PSRAM_64M
+@import init_psram
+#else
+@import psram_init_APS3208K
+#endif
+
+@import init_cmos
+@import layer0_input_psram_adr
+@import yolo_run_frame
+
+$func spi_write_frame(in frame_adr)
+$func spi_write_result()
+
+entry:
+	call irq_vertor_table_init
+	bit_set cr cr 0
+
+	//svw 0x09000024 0x02
+
+	//---------------------------------------------------------------------------- 
+	//clk_initial
+	//----------------------------------------------------------------------------
+	svw 0x09000000, 0x11313390 //clk_in=12M, VCO=960M, pll1=240M, pll2=24M
+	svw 0x09000008, 0x00208016 //spi=12M, sensor_clk = 12M
+
+	// spi_init
+    svw 0x09000500,0x1a000
+    svw 0x09000504,0x103
+	//key init,用于跟PC同步
+    svw 0x09000a58,1
+    svw 0x09000a54,8000
+    svw 0x09000b00,1
+    svw 0x09000b0c,0
+#if !PSRAM_64M
+	call psram_init_APS3208K
+#else
+	call init_psram
+#endif
+	call init_cmos
+
+loop_sta:
+	hlt 2
+	wait_key
+
+	lvw r1,0x0900022c //r1=当前图像的psram地址
+	lc r0, PSRAM_FRAME_0
+	svw 0x09000210, PSRAM_FRAME_0
+	svw layer0_input_psram_adr PSRAM_IMAGE_1
+	ifu r1==r0 {
+		//双缓存切换
+		svw 0x09000210, PSRAM_FRAME_1
+		svw layer0_input_psram_adr PSRAM_IMAGE_0
+	}
+
+	lvw r1,layer0_input_psram_adr
+	spi_write_frame(r1)
+
+	/*
+	算法从这里开始,psram图像地址r1
+	*/
+	lc r0 RECT_ADR_START
+	add r1 r0 4
+	sw r0 r1
+	
+	call yolo_run_frame
+
+
+	spi_write_result()
+
+
+	jmp loop_sta
+
+
+$func TIME1_IRQ_Handler() {
+
+}	
+
+//----------------------------------------------------------------------------
+// Empty_ISR
+// ---------------------------------------------------------------------------	
+Empty_ISR:
+iret
+
+//----------------------------------------------------------------------------
+// 定时器\计数器\按键中断(按键下降沿有效) 处理函数
+// ---------------------------------------------------------------------------	
+IRQ_TBL_timer_counter_key:
+	push irp
+
+	$push_regs r0
+
+	lvw r0 0x09000a5c
+
+	ifu r0 eb 0 {  // BIT[0]
+		TIME1_IRQ_Handler()
+	}
+
+	$pop_regs r0
+	pop irp
+iret
+
+IRQ_TBL_soft_exception:
+	push irp
+
+	$push_regs r0
+	nop
+	$pop_regs r0
+
+	pop irp
+iret
+
+//----------------------------------------------------------------------------
+// Interrupt Vector Table 初始化中断向量表
+// ---------------------------------------------------------------------------
+@export irq_vertor_table_init
+irq_vertor_table_init:
+	lc iv12 Empty_ISR
+	lc iv11 Empty_ISR
+	lc iv10 Empty_ISR
+	lc iv9  Empty_ISR
+	lc iv8  Empty_ISR
+	lc iv7  Empty_ISR
+	lc iv6  Empty_ISR
+	lc iv5  Empty_ISR
+	lc iv4  Empty_ISR
+	lc iv3  IRQ_TBL_timer_counter_key
+	lc iv2  Empty_ISR
+	lc iv1  Empty_ISR
+	lc iv0  IRQ_TBL_soft_exception
+ret

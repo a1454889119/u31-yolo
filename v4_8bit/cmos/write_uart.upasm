@@ -1,0 +1,107 @@
+#include layer_param.upinc
+
+#define tarptr ptr0
+#define count r0
+#define x0 r1
+#define y0 r2
+#define x1 r3
+#define y1 r4
+#define i r5
+#define uartadr r6
+#define sum r7
+#define facecount r8
+#define taradr r9
+#define faceadr r10
+
+#define type r7
+#define tlow r10
+#define thigh r11
+#define ff r12
+
+#define cx s4_2
+#define cy s4_3
+#define tw s4_0
+#define th s4_1
+
+#define UART_X0_OFF 2
+#define UART_Y0_OFF 4
+#define UART_X1_OFF 6
+#define UART_Y1_OFF 8
+#define UART_SUM_OFF 10
+
+@export write_uart
+write_uart:
+
+	lcs uartadr UART_TX_BUF
+	lcs ff 0xff
+
+	lc taradr, TARGETS_ADDR + 4
+	lc tarptr, TARGETS_ADDR
+	lcs i 0
+	lcs facecount 0
+	lw count tarptr
+	whileu i < count {
+		lw type taradr
+		ifu type == 0 {
+			inc facecount 1
+			mov faceadr taradr
+		}
+		inc taradr 24
+		inc i 1
+	}
+
+	ifu facecount == 1 {
+		lm s4 faceadr 8
+		nop
+		
+		srs tw tw 1
+		srs th th 1
+
+		sub x0 cx tw
+		add x1 cx tw
+		sub y0 cy th
+		add y1 cy th
+
+		max x0 x0 0
+		max y0 y0 0
+
+		lcs sum, 0x55 + 0x08 + 0xaa
+		sru thigh x0 8
+		and tlow x0 ff
+		inc sum thigh
+		inc sum tlow
+		sbyte uartadr thigh UART_X0_OFF
+		sbyte uartadr tlow, UART_X0_OFF + 1
+
+		sru thigh y0 8
+		and tlow y0 ff
+		inc sum thigh
+		inc sum tlow
+		sbyte uartadr thigh UART_Y0_OFF
+		sbyte uartadr tlow, UART_Y0_OFF + 1
+
+		sru thigh x1 8
+		and tlow x1 ff
+		inc sum thigh
+		inc sum tlow
+		sbyte uartadr thigh UART_X1_OFF
+		sbyte uartadr tlow, UART_X1_OFF + 1
+
+		sru thigh y1 8
+		and tlow y1 ff
+		inc sum thigh
+		inc sum tlow
+		sbyte uartadr thigh UART_Y1_OFF
+		sbyte uartadr tlow, UART_Y1_OFF + 1
+
+		sbyte uartadr sum UART_SUM_OFF
+
+		lc x0, 0x00C00000  //长度
+		lc y0, UART_TX_BUF //数据地址
+		or x0, x0, y0
+		svw 0x09000804, x0 //启动UART0发送	
+	}
+	ret
+
+UART_TX_BUF:
+.byte 0x55,0x08, 0x01,0x00,0x00,0xa0, 0x01,0x20,0x00,0xc0, 0x89,0xaa

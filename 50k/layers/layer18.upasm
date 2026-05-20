@@ -1,0 +1,160 @@
+//---------------LAYER 18(conv)-------------
+//input:44x22x36
+//output:44x22x24
+//k1s1p0,group=1
+//leaky
+// output:whc
+
+#include "layers_common.upinc"
+
+#define in_0 s0
+#define in_1 s1
+#define in_2 s2
+#define in_3 s3
+#define in_4 d0
+
+#define k0_0 s4
+#define k0_1 s5
+#define k0_2 s6
+#define k0_3 s7
+#define k0_4 d1
+
+#define k1_0 s8
+#define k1_1 s9
+#define k1_2 s10
+#define k1_3 s11
+#define k1_4 d2
+
+#define k2_0 s12
+#define k2_1 s13
+#define k2_2 s14
+#define k2_3 s15
+#define k2_4 d3
+
+#define b0 r3
+#define b1 r4
+#define b2 r5
+#define res0 r6
+#define res1 r7
+#define res2 r8
+
+#define output_ptr r9
+#define bias_ptr r10
+#define i r11
+#define wh_x2 r12
+#define wh_x4 r13
+#define wh_x6 r14
+#define wh_x72 r15
+#define input_end r16
+#define input_start r17
+#define output_start r18
+
+#define input_ptr ptr0
+#define kernel_ptr ptr1
+
+@export layer_18
+layer_18:
+	lcs wh_x2 1936	// 44*22*2
+	sl wh_x4 wh_x2 1
+	add wh_x6 wh_x2 wh_x4
+	muls16 wh_x72 wh_x4 18 // 64
+
+	lcs input_ptr layer_14_output
+	mov input_start input_ptr
+	add input_end input_ptr wh_x72
+	lc  output_ptr layer_18_output
+	mov output_start output_ptr
+	mov bias_ptr bias_addr
+	mov kernel_ptr kernel_addr
+
+	lcs i 0
+	$jump_regs r30 ...
+	// 8轮, 每轮得到3个输出通道
+	whileu i < 8 {
+		lw b0 bias_ptr 0
+		lw b1 bias_ptr 4
+		lw b2 bias_ptr 8
+		inc bias_ptr 12
+
+		lm  k0_0 kernel_ptr
+		lm  k0_1 kernel_ptr
+		lm  k0_2 kernel_ptr
+		lm  k0_3 kernel_ptr
+		l64 k0_4 kernel_ptr
+
+		lm  k1_0 kernel_ptr
+		lm  k1_1 kernel_ptr
+		lm  k1_2 kernel_ptr
+		lm  k1_3 kernel_ptr
+		l64 k1_4 kernel_ptr
+
+		lm  k2_0 kernel_ptr
+		lm  k2_1 kernel_ptr
+		lm  k2_2 kernel_ptr
+		lm  k2_3 kernel_ptr
+		l64 k2_4 kernel_ptr
+
+		mov output_ptr output_start
+		mov input_ptr input_start
+
+		lcs r21 484
+		lcs r20 0
+		whileu input_ptr < input_end {
+			inc r20 1
+			ifu r20 == r21 {
+				nop
+			}
+			// 读输入
+			lm  in_0 input_ptr
+			lm  in_1 input_ptr
+			lm  in_2 input_ptr
+			lm  in_3 input_ptr
+			l64 in_4 input_ptr
+			
+			mov res0 b0
+			mov res1 b1
+			mov res2 b2
+			//mov res0 0
+			//mov res1 0
+			//mov res2 0
+
+			simd_mac16_8     res0 in_0 k0_0
+			simd_mac16_8     res1 in_0 k1_0
+			simd_mac16_8     res2 in_0 k2_0
+			nop
+
+			simd_mac16_8     res0 in_1 k0_1
+			simd_mac16_8     res1 in_1 k1_1
+			simd_mac16_8     res2 in_1 k2_1
+			nop
+
+			simd_mac16_8     res0 in_2 k0_2
+			simd_mac16_8     res1 in_2 k1_2
+			simd_mac16_8     res2 in_2 k2_2
+			nop
+
+			simd_mac16_8     res0 in_3 k0_3
+			simd_mac16_8     res1 in_3 k1_3
+			simd_mac16_8     res2 in_3 k2_3
+			nop
+
+			simd_mac16_4 res0 in_4 k0_4
+			simd_mac16_4 res1 in_4 k1_4
+			simd_mac16_4 res2 in_4 k2_4
+			nop
+
+			leaky res0 res0 10
+			leaky res1 res1 10
+			leaky res2 res2 10
+			ssl output_ptr res0
+			ssl output_ptr res1 wh_x2
+			ssl output_ptr res2 wh_x4
+
+			inc output_ptr 2
+		}		
+		inc output_start wh_x6
+		inc i 1
+	}
+	$jump_regs end
+
+	ret

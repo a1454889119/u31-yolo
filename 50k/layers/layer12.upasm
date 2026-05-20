@@ -1,0 +1,36 @@
+//---------------LAYER 12(conv)-------------
+//input:44x22x24
+//output:44x22x8
+//k1s1p0,group=1
+//linear
+// 44x22x24=>44x22x8 1x1卷积, linear, 输入cwh 输出cwh
+#include "layers_common.upinc"
+
+@import conv_k1_i24o8_params
+@import conv_k1_i24o8_cwh
+
+@export layer_12
+layer_12:
+	sv layer_rp_adr0 rp
+	//conv_k1_i24o8_params:
+	//.word 0 // input_adr
+	//.word 0 // input_end
+	//.word 0 // kernel_adr
+	//.word 0 // bias_adr
+	//.word 0 // output_adr
+	lcs ptr0 conv_k1_i24o8_params
+	lc t0 layer_11_output
+	
+	lcs ptr0 conv_k1_i24o8_params
+	lcs t1 46464 // 44*22*24*2
+	add t1 t0 t1
+
+	sw  ptr0 t0
+	sw  ptr0 t1
+	sw  ptr0 kernel_addr
+	sw  ptr0 bias_addr
+	svw ptr0 layer_12_output
+	call conv_k1_i24o8_cwh
+	
+	lv rp layer_rp_adr0
+	ret

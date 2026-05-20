@@ -1,0 +1,105 @@
+#define reg_spi_buf 0x0900050c
+/*
+[31:24]  spi_cmd       //SPI指令码,发送纯数据指令码为0
+[23]     spi_wr        //1:write, 0:read  
+[18:0]   spi_dat_num   //SPI每次读/写的字节数，最大为内存大小  
+*/
+#define reg_spi_cmd 0x09000510
+
+.align 16
+spi_out_buf:
+.reserve 1024
+
+$func spi_read_frame(in frame_adr) {
+	reg c_0x800000, c_1024, psram_write_code
+	reg spi_out_ptr, img_ptr, img_end
+	reg len, t1
+
+	lc c_0x800000 0x800000
+	lcs c_1024 1024
+	lc spi_out_ptr spi_out_buf
+	load_reg img_ptr frame_adr
+	// lc img_ptr PSRAM_LAYER_0_INPUT
+	lc img_end, 320*224*3
+	inc img_end img_ptr
+#var PSRAM_WRITE_CODE 0
+#set_bits PSRAM_WRITE_CODE 31 24 0x80 	// [31:24]  spi_cmd       //SPI指令码, 写0x09000610启动一次读、写  
+#set_bits PSRAM_WRITE_CODE 23 23 1 		// [23]     spi_wr        //1:write, 0:read  '
+
+	lc psram_write_code PSRAM_WRITE_CODE
+
+	whileu img_ptr < img_end {
+		sub len img_end img_ptr
+		min len len c_1024
+		or t1 len c_0x800000
+
+		// 接收spi数据
+		wait_key
+		svw reg_spi_buf,spi_out_ptr
+		svw reg_spi_cmd,t1
+		wait_spi
+		
+		// 写入PSRAM
+		svw 0x09000608, img_ptr
+		svw 0x0900060c, spi_out_ptr
+		or t1 len psram_write_code
+		svw 0x09000610, t1
+		sv 0x09000620 1
+		wait_psram
+
+		inc img_ptr len
+	}
+
+	// 将要发送的1024字节写为0
+
+}
+
+$func spi_write_frame(in frame_adr) {
+	reg c_0x800000, c_1024, psram_read_code
+	reg spi_out_ptr, img_ptr, img_end
+	reg len, t1
+
+	lc c_0x800000 0x800000
+	lcs c_1024 1024
+	lc spi_out_ptr spi_out_buf
+	load_reg img_ptr frame_adr
+	// lc img_ptr PSRAM_LAYER_0_INPUT
+	lc img_end, 320*224*3
+	inc img_end img_ptr
+
+	//lc psram_read_code PSRAM_READ_CODE
+
+	whileu img_ptr < img_end {
+		sub len img_end img_ptr
+		min len len c_1024
+
+		// 读psram数据
+		svw 0x09000608, img_ptr
+		svw 0x0900060c, spi_out_ptr		
+		svw 0x09000610, len
+		sv 0x09000620 1
+		wait_psram
+
+		// 接收spi数据
+		or t1 len c_0x800000
+		wait_key
+		svw reg_spi_buf,spi_out_ptr
+		svw reg_spi_cmd,t1
+		wait_spi
+		
+		inc img_ptr len
+	}
+
+	// 将要发送的1024字节写为0
+
+}
+
+
+$func spi_write_result() {
+	// spi发送结果(固定1024字节)
+	wait_key
+	svw reg_spi_buf, RECT_ADR_START
+	svw reg_spi_cmd, 0x800400
+	wait_spi
+	
+}

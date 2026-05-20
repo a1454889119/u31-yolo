@@ -1,0 +1,40 @@
+#BUILD-INFO
+TYPE=APP
+NAME=yolo_cmos_3901
+CFG=u31
+ENTRY_NAME=entry
+STACK_SIZE=256
+
+#DEBUG-INFO
+DEBUG_TYPE=IIC
+SIMULATE_DATA=simdata
+#I2C_ADDR_BYTE=0x50
+
+#OUTPUT-INFO
+PATH=out
+BIN=true
+HEX=true
+MAP=false
+OBJS=false
+
+#FILES
+[ext]upinc
+[ext]upasm
+
+#EXCLUDE
+[dir]out
+single_frame.upasm
+yolo_cmos_2013.upasm
+
+#MACROS
+#define MEMORY_DATA_SIZE (1024*225)
+#define FLIP_X 0x00
+#define KERNEL_DATA_SIZE (1024*17)
+#define SORT_TARGETS 0
+
+#define FACEPALM_3_CLASSES			 1
+#define OTA_ENABLE                   0        //add by yuzh 使能OTA
+#define BRIGHTNESS_LEVEL_LOW         39       //平均亮度最低的阈值
+#define CLIP_ROWS					 0x28
+#GENERATION
+PREFIX=u31_sys

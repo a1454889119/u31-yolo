@@ -1,0 +1,100 @@
+#define k0 s0
+
+#define in0 s1
+#define in1 s2
+#define in2 s3
+#define in3 s4
+#define in4 s5
+#define in5 s6
+#define in6 s7
+#define in7 s8
+#define in8 s9
+#define in9 s10
+#define in10 s11
+#define in11 s12
+
+#define outptr ptr0
+#define inptr ptr1
+#define kptr ptr2
+#define bptr ptr3
+
+$func conv1_96in_48out_whc(in input, in output, in kernels, in width_x_height) {
+	reg i, j, wxh, bstart, kadr, b0, outadr
+	reg rj0, rj1
+	nop
+	load_reg kadr kernels
+	load_reg inptr input
+	load_reg outadr output
+	load_reg wxh width_x_height
+
+	// 设置ptr0偏移值为wxh*2
+	add i wxh wxh
+	lc j 0x10000
+	or i i j
+	svw 0x09000058, i
+
+	lcs bstart, 48*96*2
+	inc bstart kadr
+
+	lcs i 0
+	$jump_regs rj0 rj1
+	whileu i < wxh {
+		lm_d in0 inptr
+		lm_d in1 inptr
+		lm_d in2 inptr
+		lm_d in3 inptr
+		lm_d in4 inptr
+		lm_d in5 inptr
+		lm_d in6 inptr
+		lm_d in7 inptr
+		lm_d in8 inptr
+		lm_d in9 inptr
+		lm_d in10 inptr
+		lm_d in11 inptr
+
+		mov kptr kadr
+		mov bptr bstart
+		mov outptr outadr
+
+		lcs j 0
+		whileu j < 48 {
+			lw b0 bptr
+
+			lm_d k0 kptr
+			simd_mac16_8 b0 k0 in0
+			lm_d k0 kptr
+			simd_mac16_8 b0 k0 in1
+			lm_d k0 kptr
+			simd_mac16_8 b0 k0 in2
+			lm_d k0 kptr
+			simd_mac16_8 b0 k0 in3
+			lm_d k0 kptr
+			simd_mac16_8 b0 k0 in4
+			lm_d k0 kptr
+			simd_mac16_8 b0 k0 in5
+			lm_d k0 kptr
+			simd_mac16_8 b0 k0 in6
+			lm_d k0 kptr
+			simd_mac16_8 b0 k0 in7
+			lm_d k0 kptr
+			simd_mac16_8 b0 k0 in8
+			lm_d k0 kptr
+			simd_mac16_8 b0 k0 in9
+			lm_d k0 kptr
+			simd_mac16_8 b0 k0 in10
+			lm_d k0 kptr
+			simd_mac16_8 b0 k0 in11
+
+			inc j 1
+			leaky b0 b0 10
+			ssl outptr b0
+		}
+		inc outadr 2
+
+		inc i 1
+	}
+	$jump_regs end
+	// ptr0 偏移值写回0
+	svw 0x09000058 0
+	nop
+}

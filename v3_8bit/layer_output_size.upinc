@@ -1,0 +1,66 @@
+// Layer output lengths
+#define LAYER_0_OUTPUT_SIZE 102400 // 8bit 320x160x  1->160x 80x  8 conv k3s2p1g1 leaky
+#define LAYER_1_OUTPUT_SIZE 102400 // 8bit 160x 80x  8->160x 80x  8 conv k1s1p0g1 leaky
+#define LAYER_2_OUTPUT_SIZE 25600 // 8bit 160x 80x  8-> 80x 40x  8 conv k3s2p1g8
+#define LAYER_3_OUTPUT_SIZE 76800 // 8bit  80x 40x  8-> 80x 40x 24 conv k1s1p0g1 leaky
+#define LAYER_4_OUTPUT_SIZE 38400 // 8bit  80x 40x 12-> 80x 40x 12 conv k1s1p0g1 leaky
+#define LAYER_5_OUTPUT_SIZE 38400 // 8bit  80x 40x 12-> 80x 40x 12 conv k3s1p1g12 leaky
+#define LAYER_6_OUTPUT_SIZE 38400 // 8bit  80x 40x 12-> 80x 40x 12 conv k1s1p0g1 leaky
+#define LAYER_7_OUTPUT_SIZE 38400 // 8bit  80x 40x 12-> 80x 40x 12 conv k3s1p1g12 leaky
+#define LAYER_8_OUTPUT_SIZE 38400 // 8bit  80x 40x 12-> 80x 40x 12 conv k1s1p0g1 leaky
+#define LAYER_9_OUTPUT_SIZE 38400 // 8bit  80x 40x 12-> 80x 40x 12 conv k3s1p1g12 leaky
+#define LAYER_10_OUTPUT_SIZE 38400 // 8bit  80x 40x 12-> 80x 40x 12 conv k1s1p0g1 leaky
+#define LAYER_11_OUTPUT_SIZE 38400 // 8bit  80x 40x 12-> 80x 40x 12 conv k3s1p1g12 leaky
+#define LAYER_12_OUTPUT_SIZE 76800 // 8bit  80x 40x 48-> 80x 40x 24 conv k1s1p0g1 leaky
+#define LAYER_13_OUTPUT_SIZE 19200 // 8bit  80x 40x 24-> 40x 20x 24 conv k3s2p1g24 leaky
+#define LAYER_14_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 conv k1s1p0g1 leaky
+#define LAYER_15_OUTPUT_SIZE 38400 // 8bit  40x 20x 24-> 40x 20x 48 conv k1s1p0g1 leaky
+#define LAYER_16_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 conv k1s1p0g1 leaky
+#define LAYER_17_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 conv k3s1p1g24 leaky
+#define LAYER_18_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 conv k1s1p0g1 leaky
+#define LAYER_19_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 conv k3s1p1g24 leaky
+#define LAYER_20_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 conv k1s1p0g1 leaky
+#define LAYER_21_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 conv k3s1p1g24 leaky
+#define LAYER_22_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 conv k1s1p0g1 leaky
+#define LAYER_23_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 conv k3s1p1g24 leaky
+#define LAYER_24_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 conv k1s1p0g1 leaky
+#define LAYER_25_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 conv k3s1p1g24 leaky
+#define LAYER_26_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 conv k1s1p0g1 leaky
+#define LAYER_27_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 conv k3s1p1g24 leaky
+#define LAYER_28_OUTPUT_SIZE 38400 // 8bit  40x 20x120-> 40x 20x 48 conv k1s1p0g1 leaky
+#define LAYER_29_OUTPUT_SIZE 19200 // 8bit  40x 20x 48-> 40x 20x 24 conv k1s1p0g1 leaky
+#define LAYER_30_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 maxpool k5s1p2
+#define LAYER_31_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 maxpool k5s1p2
+#define LAYER_32_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 maxpool k5s1p2
+#define LAYER_33_OUTPUT_SIZE 38400 // 8bit  40x 20x 96-> 40x 20x 48 conv k1s1p0g1 leaky
+#define LAYER_34_OUTPUT_SIZE 19200 // 8bit  40x 20x 48-> 40x 20x 24 conv k3s1p1g24 leaky
+#define LAYER_35_OUTPUT_SIZE 38400 // 16bit  40x 20x 24-> 40x 20x 24 conv k1s1p0g1 leaky
+#define LAYER_36_OUTPUT_SIZE 48 // 16bit  40x 20x 24->  1x  1x 24 global avg
+#define LAYER_37_OUTPUT_SIZE 48 // 16bit   1x  1x 24->  1x  1x 24 conv k1s1p0g1 sigmoid
+#define LAYER_38_OUTPUT_SIZE 19200 // 8bit  40x 20x 48-> 40x 20x 24 mul
+#define LAYER_39_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 conv k3s1p1g24 leaky
+#define LAYER_40_OUTPUT_SIZE 16000 // 8bit  40x 20x 24-> 40x 20x 20 conv k1s1p0g1
+#define LAYER_41_OUTPUT_SIZE 16000 // 8bit  40x 20x 20-> 40x 20x 20 conv k3s1p1g20 leaky
+#define LAYER_42_OUTPUT_SIZE 16000 // 8bit  40x 20x 20-> 40x 20x 20 conv k1s1p0g1
+#define LAYER_43_OUTPUT_SIZE 6400 // 16bit  40x 20x 20-> 40x 20x  4 conv k1s1p0g1
+#define LAYER_44_OUTPUT_SIZE 19200 // 8bit  40x 20x 24-> 40x 20x 24 conv k3s1p1g24 leaky
+#define LAYER_45_OUTPUT_SIZE 16000 // 8bit  40x 20x 24-> 40x 20x 20 conv k1s1p0g1
+#define LAYER_46_OUTPUT_SIZE 16000 // 8bit  40x 20x 20-> 40x 20x 20 conv k3s1p1g20 leaky
+#define LAYER_47_OUTPUT_SIZE 16000 // 8bit  40x 20x 20-> 40x 20x 20 conv k1s1p0g1
+#define LAYER_48_OUTPUT_SIZE 64000 // 16bit  40x 20x 20-> 40x 20x 40 conv k1s1p0g1
+#define LAYER_49_OUTPUT_SIZE 76800 // 8bit  40x 20x 24-> 80x 40x 24 upsample
+#define LAYER_50_OUTPUT_SIZE 76800 // 8bit  80x 40x 48-> 80x 40x 24 conv k3s1p1g24 leaky
+#define LAYER_51_OUTPUT_SIZE 153600 // 16bit  80x 40x 24-> 80x 40x 24 conv k1s1p0g1 leaky
+#define LAYER_52_OUTPUT_SIZE 48 // 16bit  80x 40x 24->  1x  1x 24 global avg
+#define LAYER_53_OUTPUT_SIZE 48 // 16bit   1x  1x 24->  1x  1x 24 conv k1s1p0g1 sigmoid
+#define LAYER_54_OUTPUT_SIZE 76800 // 8bit  80x 40x 48-> 80x 40x 24 mul
+#define LAYER_55_OUTPUT_SIZE 76800 // 8bit  80x 40x 24-> 80x 40x 24 conv k3s1p1g24 leaky
+#define LAYER_56_OUTPUT_SIZE 64000 // 8bit  80x 40x 24-> 80x 40x 20 conv k1s1p0g1
+#define LAYER_57_OUTPUT_SIZE 64000 // 8bit  80x 40x 20-> 80x 40x 20 conv k3s1p1g20 leaky
+#define LAYER_58_OUTPUT_SIZE 64000 // 8bit  80x 40x 20-> 80x 40x 20 conv k1s1p0g1
+#define LAYER_59_OUTPUT_SIZE 25600 // 16bit  80x 40x 20-> 80x 40x  4 conv k1s1p0g1
+#define LAYER_60_OUTPUT_SIZE 76800 // 8bit  80x 40x 24-> 80x 40x 24 conv k3s1p1g24 leaky
+#define LAYER_61_OUTPUT_SIZE 64000 // 8bit  80x 40x 24-> 80x 40x 20 conv k1s1p0g1
+#define LAYER_62_OUTPUT_SIZE 64000 // 8bit  80x 40x 20-> 80x 40x 20 conv k3s1p1g20 leaky
+#define LAYER_63_OUTPUT_SIZE 64000 // 8bit  80x 40x 20-> 80x 40x 20 conv k1s1p0g1
+#define LAYER_64_OUTPUT_SIZE 256000 // 16bit  80x 40x 20-> 80x 40x 40 conv k1s1p0g1

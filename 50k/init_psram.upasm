@@ -1,0 +1,156 @@
+#define SPI_CFG 0x300886c8
+#define PSRAM_W_Latency_0  0x00000406   //Latency=0
+#define PSRAM_W_Latency_4  0x00480406   //RLatency=5,WLatency=5
+
+#define r_psram_wr_addr r10
+#define r_psram_wr_buff r11
+#define r_psram_wr_cmd  r12
+
+@export init_psram
+init_psram:
+	add rj,rp,0
+	//hard reset
+	lc r0,psram_hard_reset
+	call r0
+
+	//spi config
+	lc r0,psram_spi_config
+	call r0
+
+	lc r0,0x09000604
+	lc r1,PSRAM_W_Latency_0
+	spw r0,r1
+
+	//cmd
+	lc r0,0x09000614
+	lc r1,0x00000080
+	spw r0, r1	
+
+	//soft reset
+	lc r0,tmp_buf
+	lc r1,0
+	sw r0,r1
+
+	lc r_psram_wr_addr,0
+	lc r_psram_wr_buff,tmp_buf
+	lc r_psram_wr_cmd ,0xff800002
+	lc r0,psram_wr
+	call r0
+	hlt 0x1fffff //等待psram复位完成
+
+	//write mr
+	//write MR8
+	lc r0,tmp_buf
+	lc r1,0x00000003
+	sw r0,r1
+
+	lc r_psram_wr_addr,8
+	lc r_psram_wr_buff,tmp_buf
+	lc r_psram_wr_cmd ,0xc0800002
+	lc r0,psram_wr
+	call r0
+
+	//write MR4
+	lc r0,tmp_buf
+	lc r1,0x00000040     //Latency=5
+	//lc r1,0x00000080     //Latency=4
+	//lc r1,0x00000000     //Latency=3
+
+	sw r0,r1
+
+	lc r_psram_wr_addr,4
+	lc r_psram_wr_buff,tmp_buf
+	lc r_psram_wr_cmd ,0xc0800002
+	lc r0,psram_wr
+	call r0	
+
+	//read MR4:MR8
+	lc r0,tmp_buf
+	lc r1,0
+	sw r0,r1
+
+	lc r_psram_wr_addr,4
+	lc r_psram_wr_buff,tmp_buf
+	lc r_psram_wr_cmd ,0x40000004
+	lc r0,psram_wr
+	call r0	
+
+	lc ptr0 tmp_buf
+	nop
+	lw r0,ptr0
+	nop
+
+	//修改Latency
+	lc r0,0x09000604
+	lc r1,PSRAM_W_Latency_4
+	spw r0,r1
+
+	add rp,rj,0
+ret
+
+/*
+psram硬件复位
+reset引脚先设置低电平，延时一段时间后，设置高电平
+*/
+psram_hard_reset:
+	lc r0,0x09000b00
+	lc r1,0x10
+	spw r0,r1
+
+	lc r0,0x09000b04
+	spw r0,r1
+
+	lc r0,0x09000b08
+	spw r0,0
+
+	hlt 200
+
+	lc r0,0x09000b08
+	spw r0,r1
+ret
+
+psram_soft_reset:
+
+ret
+
+/*
+psram spi接口配置
+*/
+psram_spi_config:
+	lc r0,0x09000600
+	lc r1,SPI_CFG
+	spw r0,r1
+ret
+
+/*
+读写psram内存或寄存器
+@r_psram_wr_addr:psram地址
+@r_psram_wr_buff:ram地址
+@cmd:读写命令
+*/
+psram_wr:
+	lc r0,0x09000608 //psram addr
+	spw r0,r_psram_wr_addr
+
+	lc r0,0x0900060c //ram addr
+	spw r0,r_psram_wr_buff
+
+	lc r0,0x09000610
+	spw r0,r_psram_wr_cmd 
+
+	hlt 7
+ret
+
+
+
+
+.align 16
+tmp_buf:
+	.reserve 16
+wr_in_buf:
+	.byte 0x01 0x02 0x03 0x04 0x05 0x06 0x07 0x08  0x09 0x0a 0x0b 0x0c 0x0d 0x0e 0x0f 0x11
+// .byte 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff  0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff
+rd_ot_buf:
+	.reserve 16
+	
+

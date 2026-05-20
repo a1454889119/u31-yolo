@@ -1,0 +1,137 @@
+@auto_export_start
+//#section-start no-download
+
+layer_rp_adr0:
+.word 0
+
+layer_rp_adr1:
+.word 0
+
+layer_16_psram_adr:
+.word 0
+
+box_count:
+.word 0
+
+box_data:
+.reserve 632
+
+.align 16
+
+layer_0_output:
+layer_2_output:
+layer_4_output:
+layer_9_output:
+layer_14_output:
+layer_16_output:
+layer_29_output:
+layer_31_output:
+// before addr :0
+.reserve 15488
+// after addr :15488
+
+layer_10_output:
+// before addr :15488
+.reserve 7744
+// after addr :23232
+
+layer_19_output:
+layer_33_output:
+// before addr :23232
+.reserve 11616
+// after addr :34848
+
+layer_5_output:
+layer_20_output:
+// before addr :34848
+.reserve 3872
+// after addr :38720
+
+layer_21_output:
+// before addr :38720
+.reserve 3872
+// after addr :42592
+
+layer_34_output:
+// before addr :42592
+.reserve 7744
+// after addr :50336
+
+layer_6_output:
+// before addr :50336
+.reserve 7744
+// after addr :58080
+
+layer_22_output:
+// before addr :58080
+.reserve 3872
+// after addr :61952
+
+layer_11_output:
+layer_35_output:
+// before addr :61952
+.reserve 8576
+// after addr :70528
+
+layer_3_output:
+// before addr :70528
+.reserve 6912
+// after addr :77440
+
+layer_23_output:
+layer_36_output:
+// before addr :77440
+.reserve 3872
+// after addr :81312
+
+layer_24_output:
+// before addr :81312
+.reserve 3872
+// after addr :85184
+
+layer_25_output:
+// before addr :85184
+.reserve 11616
+// after addr :96800
+
+layer_7_output:
+// before addr :96800
+.reserve 7744
+// after addr :104544
+
+layer_26_output:
+// before addr :104544
+.reserve 3872
+// after addr :108416
+
+layer_12_output:
+// before addr :108416
+.reserve 15488
+// after addr :123904
+
+layer_13_output:
+layer_27_output:
+// before addr :123904
+.reserve 3872
+// after addr :127776
+
+layer_28_output:
+// before addr :127776
+.reserve 15488
+// after addr :143264
+
+layer_8_output:
+// before addr :143264
+.reserve 4704
+// after addr :147968
+
+layer_1_output:
+// before addr :147968
+.reserve 15488
+// after addr :163456
+
+layer_18_output:
+.reserve 46464
+
+//#section-end
+@auto_export_end

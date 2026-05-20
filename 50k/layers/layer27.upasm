@@ -1,0 +1,34 @@
+//---------------LAYER 27(conv)-------------
+//input:22x11x40
+//output:22x11x8
+//k1s1p0,group=1
+//linear
+// output:cwh
+#include "layers_common.upinc"
+
+@import conv_k1_i40o8_params
+@import conv_k1_i40o8_cwh
+
+@export layer_27
+layer_27:
+	sv layer_rp_adr0 rp
+	//conv_k1_i40o8n_params:
+	//.word 0 // input_ptr
+	//.word 0 // input_end
+	//.word 0 // kernel_ptr
+	//.word 0 // bias_ptr
+	//.word 0 // output_ptr
+	lcs ptr0 conv_k1_i40o8_params
+	lc t0 layer_26_output
+	lcs t1 LAYER_26_OUTPUT_SIZE
+	inc t1 t0
+	sw ptr0 t0
+	sw ptr0 t1
+	sw  ptr0 kernel_addr
+	sw  ptr0 bias_addr
+	svw ptr0 layer_27_output
+
+	call conv_k1_i40o8_cwh
+
+	lv rp layer_rp_adr0
+	ret

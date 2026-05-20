@@ -1,0 +1,321 @@
+#if OTA_ENABLE==1
+// #include "project.upinc"
+@import APP_VERSION_STR
+
+#define SPIOUT_MOD0 0x55555500 // SPI模式门控模式
+#define SPIOUT_MOD1 0x55555501 // SPI模式连续模式
+
+#define SPIOUT_OFF 0x55555500
+#define SPIOUT_ON  0x55555501
+
+$func memset(in addr, in value, in len)
+$func memcmp(in addr1, in addr2, in len, out reg_result)
+
+$func APP_UART0_RX_IRQ_Handler()
+
+// #define UPDATE_MAGIC_BUF_ADDR 0x3f00     //保存升级标志的地址flash 256K的最后一页
+#define UPDATE_MAGIC_BUF_ADDR 0x7ff00     //保存升级标志的地址flash 512K的最后一页
+#define UPDATE_MAGIC_VALUE    0xA5A5A5A5  //升级标志的值
+$func flash_Write_Enable()
+$func flash_Page_Erase(in flash_addr)
+$func flash_Read_SR1(in ram_addr, out reg_result)
+$func flash_w_wait()
+$func flash_Page_Program(in flash_addr, in ram_addr, in len)
+// $func flash_Normal_Read(in flash_addr, in ram_addr, in length)
+
+IRQ_TBL_UART:
+    $push_regs rp rj rv r1
+    lvw r1 0x0900081C
+
+    ifu r1 eb 4 {
+        APP_UART0_RX_IRQ_Handler()
+    }
+
+    // ifu r1 eb 7 {
+    //     UART3_RX_IRQ_Handler()
+    // }
+    
+    $pop_regs rp rj rv r1
+iret
+
+$func enable_uart_irq() {
+    lc iv10 IRQ_TBL_UART     // 设置中断向量表
+    bit_set cr cr 10         // 使能串口中断控制器
+}
+
+
+/**
+ * 串口0 发送数据
+ * addr 缓存地址 
+ * len 表示发送的bytes
+ * [31:20]   UART0接收字节数, 写寄存器启动一次发送
+ * [15:0]    UART0发送数据缓存地址
+ */
+$func uart0_tx_data_block(in addr, in len) {
+    reg x0 x1
+    nop
+// _loop_uart0_busy:
+//     lvw x0 0x0900082c
+//     ifu x0 eb 4 {      // UART0发送忙标志
+//         jmp _loop_uart0_busy     
+//     }
+
+    load_reg x0 len
+    load_reg x1 addr
+    sl x0 x0 20
+    or x0 x0 x1
+    svw 0x09000804 x0
+    hlt 9
+}
+
+/**
+ * 串口0 接收数据
+ * addr 缓存地址 
+ * len  表示发送的bytes
+ *
+ * 0x09000808
+ * [31:20]   UART0接收字节数, 写寄存器启动一次接收
+ * [15:0]    UART0接收数据缓存地址
+ * 
+ * 0x09000840
+ * [25:16]   UART1接收超时计数阈值
+ * [9:0]     UART0接收超时计数阈值
+ */
+$func uart0_rx_data(in addr, in len) {
+    reg x0 x1 x2 x3
+    nop
+    load_reg x0 len
+    load_reg x1 addr
+
+    svw 0x09000840 0x3ff  //设置超时的计数器
+
+    sl x0 x0 20
+    or x0 x0 x1
+    svw 0x09000808 x0
+    nop
+}
+
+$func APP_UART0_RX_IRQ_Handler() {
+    reg x1 x2 x3
+
+    cache_clr
+
+    lvw x1 UART_RX_CNT_BUF  // 每次起中断累加1
+    add x1 x1 1
+    svw UART_RX_CNT_BUF x1
+
+    memcmp(UART_TMP_BUF, OTA_ENTER_BUF, 8, x2) // 0xFE 0x68 0x1D 0x02 0x91 0xAA 0xc2 0x16
+    ifu x2 == 1 {            
+        flash_Write_Enable()
+        flash_Page_Erase(UPDATE_MAGIC_BUF_ADDR)
+        flash_w_wait()
+        
+        flash_Write_Enable()
+        svw APP_TMP_BUF_ADDR 0xA5A5A5A5
+        flash_Page_Program(UPDATE_MAGIC_BUF_ADDR, APP_TMP_BUF_ADDR, 4)
+        flash_w_wait()
+        
+        uart0_tx_data_block(OTA_RESP_BUF, 9)   // 发送resp
+        hlt 200000
+        svw 0x09000024 1 // 重启
+    }
+
+    // memcmp(UART_TMP_BUF, SPIOUT_OFF_BUF, 9, x2)
+    // ifu x2 == 1 {
+    //     flash_Normal_Read(UPDATE_MAGIC_BUF_ADDR, APP_TMP_BUF_ADDR, 12)
+
+    //     flash_Write_Enable()
+    //     flash_Page_Erase(UPDATE_MAGIC_BUF_ADDR)
+    //     flash_w_wait()
+        
+    //     flash_Write_Enable()
+    //     svw, APP_TMP_BUF_ADDR, 0xffffffff
+    //     svw, APP_TMP_BUF_ADDR+8, SPIOUT_OFF
+    //     flash_Page_Program(UPDATE_MAGIC_BUF_ADDR, APP_TMP_BUF_ADDR, 12)
+    //     flash_w_wait()
+
+    //     uart0_tx_data_block(SPIOUT_RESP_BUF, 9)
+    //     hlt 200000
+    //     svw 0x09000024 1 // 重启
+    // }
+
+    // memcmp(UART_TMP_BUF, SPIOUT_ON_BUF, 9, x2)
+    // ifu x2 == 1 {
+    //     flash_Normal_Read(UPDATE_MAGIC_BUF_ADDR, APP_TMP_BUF_ADDR, 12)
+
+    //     flash_Write_Enable()
+    //     flash_Page_Erase(UPDATE_MAGIC_BUF_ADDR)
+    //     flash_w_wait()
+        
+    //     flash_Write_Enable()
+    //     svw, APP_TMP_BUF_ADDR, 0xffffffff
+    //     svw, APP_TMP_BUF_ADDR+8, SPIOUT_ON
+    //     flash_Page_Program(UPDATE_MAGIC_BUF_ADDR, APP_TMP_BUF_ADDR, 12)
+    //     flash_w_wait()
+
+    //     uart0_tx_data_block(SPIOUT_RESP_BUF, 9)
+    //     hlt 200000
+    //     svw 0x09000024 1 // 重启
+    // }
+
+    memcmp(UART_TMP_BUF, QUE_VER_BUF, 9, x2)
+    ifu x2 == 1 {
+        uart0_tx_data_block(APP_VERSION_STR, 32)
+        hlt 200000;
+    }
+
+    ifu x1 >= 63 {
+        svw 0x09000800 0x00400016 // 取消串口接收中断
+    }
+    memset(UART_TMP_BUF, 0, 16)
+}
+
+// $func get_spi_onoff(out onoff) {
+//     reg x1 x2
+//     flash_Normal_Read(UPDATE_MAGIC_BUF_ADDR+8, APP_TMP_BUF_ADDR, 4) //读取用户配置
+
+// #if IMGOUT_ENABLE==1
+//     lvw x1 APP_TMP_BUF_ADDR
+//     lc x2 SPIOUT_OFF
+//     ifu x1 == x2 {
+//         lc x2 0
+//     } else {
+//         lc x2 1
+//     }
+//     set_var onoff x2
+// #else
+//     gpio_set_pull(4, 0)     //设置GPIO4下拉
+//     gpio_set_input(4)       // GPIO4 作为IMGOUT使能输入, 配置为输出直接输出, 配置不为输出则读取输入值
+//     lvw x1 APP_TMP_BUF_ADDR
+//     lc x2 SPIOUT_ON
+//     ifu x1 == x2 {
+//         lc x2 1
+//     } else {
+//         gpio_get_input_value(4, x2) // 高电平表示打开IMGOUT
+//     }
+//     gpio_unset_pull(4)   //取消GPIO4上下拉
+//     set_var onoff x2
+// #endif
+//     nop
+// }
+
+$func flash_Write_Enable() {
+    svw 0x09000700, 0x3012500
+    svw 0x09000704, 0x103
+    svw 0x09000708, 0xffffffff
+    svw 0x0900070c, 0xffffffff
+    svw 0x09000710, 0x06000000
+    hlt 6
+}
+
+$func flash_Page_Erase(in flash_addr) {
+    reg x1
+    nop
+    load_reg x1 flash_addr
+    svw 0x09000700, 0x30125b0
+    svw 0x09000704, 0x103
+    svw 0x09000708, x1
+    svw 0x0900070c, 0xffffffff
+    svw 0x09000710, 0x81000000
+    hlt 6
+}
+
+$func flash_Read_SR1(in ram_addr, out reg_result) {
+    reg x1 x2
+    nop
+    load_reg x1 ram_addr
+    svw 0x09000700, 0x3012500
+    svw 0x09000704, 0x103
+    svw 0x09000708, 0xffffffff
+    svw 0x0900070c, x1
+    svw 0x09000710, 0x5000001
+    hlt 6
+
+    cache_clr
+    lw x2 x1
+    set_var reg_result x2
+    nop
+}
+
+$func flash_w_wait() {
+    reg x1
+    flash_Read_SR1(APP_TMP_BUF_ADDR, x1)
+    whileu x1 eb 0 {
+        flash_Read_SR1(APP_TMP_BUF_ADDR, x1)
+    }
+}
+
+// 写一个page 长度固定为256字节
+$func flash_Page_Program(in flash_addr, in ram_addr, in len) {
+    reg x1 x2 x3
+    nop
+    load_reg x1 flash_addr
+    load_reg x2 ram_addr
+    load_reg x3 len
+
+    svw 0x09000700, 0x30125b0
+    svw 0x09000704, 0x103
+    svw 0x09000708, x1
+    svw 0x0900070c, x2
+
+    lc x2 0x02800000
+    or x3 x2 x3
+    svw 0x09000710, x3
+    hlt 6
+}
+
+// $func flash_Normal_Read(in flash_addr, in ram_addr, in length) {
+//     reg src_addr, dst_addr, len, tmp
+//     nop
+//     load_reg src_addr flash_addr
+//     load_reg dst_addr ram_addr
+//     load_reg len length
+    
+//     svw 0x09000700, 0x30125b0
+//     svw 0x09000704, 0x103
+//     svw 0x09000708, src_addr
+//     svw 0x0900070c, dst_addr
+//     lc tmp, 0x03000000
+//     or len len tmp
+//     svw 0x09000710, len
+//     hlt 6
+//     cache_clr
+// }
+
+.align 4
+APP_TMP_BUF_ADDR:
+    .word 0 0 0 0
+
+.align 4
+OTA_ENTER_BUF:
+    .byte 0xFE 0x68 0x1D 0x02 0x91 0xAA 0xc2 0x16  // 进入OTA指令
+
+.align 4
+OTA_RESP_BUF:
+    .byte 0xFE 0x68 0x9D 0x03 0x91 0xAA 0x00 0x43 0x16 0 0 0
+
+// .align 4
+// SPIOUT_OFF_BUF:
+//     .byte 0xFE 0x68 0x1D 0x03 0x91 0x11 0x00 0x2A 0x16 0 0 0  // 设置SPI模式关闭
+
+// .align 4
+// SPIOUT_ON_BUF:
+//     .byte 0xFE 0x68 0x1D 0x03 0x91 0x11 0x01 0x2B 0x16 0 0 0  // 设置SPI模式打开
+
+.align 4
+QUE_VER_BUF:
+    .byte 0xFE 0x68 0x1D 0x03 0x91 0x12 0x00 0x2B 0x16 0 0 0  // 查询版本号
+
+// .align 4
+// SPIOUT_RESP_BUF:
+//     .byte 0xFE 0x68 0x9D 0x03 0x91 0x10 0x00 0xA9 0x16 0 0 0  // SPI模式设置响应指令
+
+@export UART_TMP_BUF
+.align 4
+UART_TMP_BUF:
+    .word 0 0 0 0
+
+.align 4
+UART_RX_CNT_BUF:
+    .word 0
+#endif

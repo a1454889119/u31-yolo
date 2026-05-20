@@ -1,0 +1,87 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="source">
+      <UniqueIdentifier>{bc574671-1ff6-4354-a358-c339b9873298}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source\UpixNetwork">
+      <UniqueIdentifier>{865bf763-03aa-4f54-a52c-c1708e91e49e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source\UpixNetwork\Layers">
+      <UniqueIdentifier>{5c384aaf-87ea-412a-9472-73353b534bac}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source\UpixNetwork\u31">
+      <UniqueIdentifier>{17c5845d-099f-43af-849a-e4b08a75eefc}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\source\UpixNetwork\UpixNetworkCommon.h">
+      <Filter>source\UpixNetwork</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\UpixNetwork\Layers\UpixBaseLayer.h">
+      <Filter>source\UpixNetwork\Layers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\UpixNetwork\UpixLayerInfo.h">
+      <Filter>source\UpixNetwork</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\UpixNetwork\u31\u31_inst.h">
+      <Filter>source\UpixNetwork\u31</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\UpixNetwork\UpixNetwork.h">
+      <Filter>source\UpixNetwork</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\UpixNetwork\whc2cwh.hpp">
+      <Filter>source\UpixNetwork</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\UpixNetwork\TargetDecoder.h">
+      <Filter>source\UpixNetwork</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\source\UpixNetwork\UpixLayerInfo.cpp">
+      <Filter>source\UpixNetwork</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\UpixNetwork\Layers\UpixBaseLayer.cpp">
+      <Filter>source\UpixNetwork\Layers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\UpixNetwork\Layers\UpixAddLayer.cpp">
+      <Filter>source\UpixNetwork\Layers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\UpixNetwork\Layers\UpixConvLayer.cpp">
+      <Filter>source\UpixNetwork\Layers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\UpixNetwork\Layers\UpixGAvgLayer.cpp">
+      <Filter>source\UpixNetwork\Layers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\UpixNetwork\Layers\UpixMaxpLayer.cpp">
+      <Filter>source\UpixNetwork\Layers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\UpixNetwork\Layers\UpixMulLayer.cpp">
+      <Filter>source\UpixNetwork\Layers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\UpixNetwork\Layers\UpixShuffleLayer.cpp">
+      <Filter>source\UpixNetwork\Layers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\UpixNetwork\Layers\UpixUpsampleLayer.cpp">
+      <Filter>source\UpixNetwork\Layers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\UpixNetwork\u31\u31_sigmoid.c">
+      <Filter>source\UpixNetwork\u31</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\UpixNetwork\UpixNetwork.cpp">
+      <Filter>source\UpixNetwork</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\UpixNetwork\TargetDecoder.cpp">
+      <Filter>source\UpixNetwork</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\load_output_names.hpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\UpixNetwork\Layers\UpixReduceMaxLayer.cpp">
+      <Filter>source\UpixNetwork\Layers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\UpixNetwork\Layers\UpixReduceMeanLayer.cpp">
+      <Filter>source\UpixNetwork\Layers</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

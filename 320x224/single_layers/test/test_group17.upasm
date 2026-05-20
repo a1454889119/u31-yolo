@@ -1,0 +1,58 @@
+#include conv1.upinc
+#include upsample.upinc
+
+@import conv1_144_36
+@import conv1_96_36
+@import layer68_input
+@import layer90_input
+@import layer93_kernel
+@import layer93_bias
+@import layer108_kernel
+@import layer108_bias
+
+.align 16
+upsample_out_data:
+.reserve 80640
+
+conv_out_data_A:
+.reserve 5040
+
+conv_out_data_B:
+.reserve 20160
+
+entry:
+	lc r30,0x09000040
+	sw r30,3
+
+	lcs conv1_w 10
+	lcs conv1_h 7
+	// 输入96通道, 输出36通道
+	lcs conv1_in_stride 192
+	lcs conv1_out_stride 72
+	lc conv1_in_adr, layer90_input
+	lc conv1_out_adr conv_out_data_A
+	lc conv1_bias_adr layer108_bias
+	lc conv1_kernel_adr layer108_kernel
+	call conv1_96_36
+	
+	lcs upsample_in_w 10
+	lcs upsample_in_h 7
+	lc upsample_in_adr layer90_input
+	lc merge_in_adr layer68_input
+	lc upsample_out_adr upsample_out_data
+	call upsample_merge
+
+	lcs conv1_w 20
+	lcs conv1_h 14
+	// 输入144通道, 输出36通道
+	lcs conv1_in_stride 288
+	lcs conv1_out_stride 72
+	lc conv1_in_adr, upsample_out_data
+	lc conv1_out_adr conv_out_data_B
+	lc conv1_bias_adr layer93_bias
+	lc conv1_kernel_adr layer93_kernel
+	call conv1_144_36
+
+	lc r30,0x09000040
+	lw r31,r30
+	hlt

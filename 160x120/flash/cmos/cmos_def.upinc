@@ -1,0 +1,11 @@
+#define CMOS_BF30A2          1
+#define CMOS_BF3901          1
+
+#define CMOS_BF30A2_160x240  0
+#define CMOS_BF3901_240x320  0
+
+
+#define OUTPUT_120x160       1     //输出分辨率120x160
+#define OUTPUT_240x320       0     //输出分辨率240x320
+
+#define DVP_OUT_ENABLE       0

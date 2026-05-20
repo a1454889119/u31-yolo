@@ -1,0 +1,117 @@
+#include conv1.upinc
+
+#define kernel_ptr ptr0
+#define output_ptr ptr2
+#define input_ptr ptr3
+
+#define br0   s4
+#define br0_0 s4_0
+#define br0_1 s4_1
+#define br0_2 s4_2
+#define br0_3 s4_3
+
+#define br1   s5
+#define br1_0 s5_0
+#define br1_1 s5_1
+#define br1_2 s5_2
+#define br1_3 s5_3
+
+#define br2   s6
+#define br2_0 s6_0
+#define br2_1 s6_1
+#define br2_2 s6_2
+#define br2_3 s6_3
+
+#define in_0 s0
+#define in_1 s1
+#define in_2 s2
+#define in_3 s3
+#define in_4 d7
+
+#define k0_0 s13
+#define k0_1 s14
+#define k0_2 s7
+#define k0_3 s8
+#define k0_4 d6
+
+#define kn_0 s9
+#define kn_1 s10
+#define kn_2 s11
+#define kn_3 s12
+#define kn_4 d5
+
+// 不需要考虑输入输出stride
+@export conv1_36_12
+conv1_36_12:
+
+	mov kernel_ptr conv1_kernel_adr
+	mov input_ptr conv1_in_adr
+	mov output_ptr conv1_out_adr
+
+	lm_d  k0_0 kernel_ptr
+	lm_d  k0_1 kernel_ptr
+	lm_d  k0_2 kernel_ptr
+	lm_d  k0_3 kernel_ptr
+	l64_d k0_4 kernel_ptr
+
+	muls16 conv1_input_end conv1_w conv1_h
+	muls32 conv1_input_end conv1_input_end conv1_in_stride
+	inc conv1_input_end input_ptr
+
+	mov conv1_kernel_adr kernel_ptr
+	$jump_regs r20
+	whileu input_ptr < conv1_input_end {
+		mov kernel_ptr conv1_kernel_adr
+
+		lm_d br0 conv1_bias_adr
+		lm_d br1 conv1_bias_adr 16
+		lm_d br2 conv1_bias_adr 32
+
+		lm_d in_0 input_ptr
+		simd_mac16_8 	br0_0 k0_0  in_0
+		lm_d in_1 input_ptr
+		simd_mac16_8 	br0_0 k0_1  in_1
+		lm_d in_2 input_ptr
+		simd_mac16_8 	br0_0 k0_2  in_2
+		lm_d in_3 input_ptr
+		simd_mac16_8 	br0_0 k0_3  in_3
+		l64_d in_4 input_ptr
+		simd_mac16_4 br0_0 k0_4  in_4
+
+#define load_calc(res) \
+lm_d kn_0 kernel_ptr;\
+simd_mac16_8 	res kn_0  in_0;\
+lm_d kn_1 kernel_ptr;\
+simd_mac16_8 	res kn_1  in_1;\
+lm_d kn_2 kernel_ptr;\
+simd_mac16_8 	res kn_2  in_2;\
+lm_d kn_3 kernel_ptr;\
+simd_mac16_8 	res kn_3  in_3;\
+l64_d kn_4 kernel_ptr;\
+simd_mac16_4 res kn_4  in_4;
+
+		load_calc(br0_1)
+		load_calc(br0_2)
+		load_calc(br0_3)
+
+		load_calc(br1_0)
+		load_calc(br1_1)
+		load_calc(br1_2)
+		load_calc(br1_3)
+
+		load_calc(br2_0)
+		load_calc(br2_1)
+		load_calc(br2_2)
+		load_calc(br2_3)
+
+		simd_linear d0 br0 10
+		simd_linear d1 br1 10
+		simd_linear d2 br2 10
+
+		s64 output_ptr d0
+		s64 output_ptr d1
+		s64 output_ptr d2
+	}
+	$jump_regs end
+
+	ret

@@ -1,0 +1,16 @@
+#if OTA_ENABLE==0
+@export KERNEL_ADDR //charge by yuzh 宏定义为0
+.align 16
+KERNEL_ADDR:
+.reserve KERNEL_DATA_SIZE
+#endif
+
+@export MEMORY
+.align 16
+MEMORY:
+.reserve MEMORY_DATA_SIZE
+
+@export APP_VERSION_STR
+.align 4
+APP_VERSION_STR: 
+.text "YOLO_FYLD_V1.1.1_20260413"

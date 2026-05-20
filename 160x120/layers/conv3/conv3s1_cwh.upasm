@@ -1,0 +1,73 @@
+
+#define k0 s0
+#define k1 s1	
+#define outptr ptr0
+#define kptr ptr1
+
+$func conv3s1_leaky_cwh(in input, in output, in channels, in kernels, in dstw, in dsth, in outstride) {
+	reg i, j, b0, badr, inadr, outadr, w, h, wxh, whx2, c, outs
+	reg rj0, rj1
+	nop
+	load_reg kptr kernels
+	load_reg inadr input
+	load_reg outadr output
+	load_reg w dstw
+	load_reg h dsth
+	load_reg c channels
+	load_reg outs outstride
+
+	muls16 wxh w h
+	sl whx2 wxh 1
+	sl badr, c, 5 // 32*c
+	inc badr, kptr
+	
+	// 设置ptr0偏移值为outs
+	lcs j 0x10000
+	or i outs j
+	svw 0x09000058, i
+	// 设置VDMA参数
+	svw 0x0900040c 0x00000000
+	svw 0x09000414 0x02331100
+	sl i w 16
+	or i i h
+	svw 0x09000418 i
+	svw 0x0900041C 0x00000000
+	svw 0x09000420 whx2
+	lc i 0x50000000
+	sl j w 1
+	or i i j
+	svw 0x09000424 i
+
+	lcs i 0
+	$jump_regs rj0 rj1
+	whileu i < c {
+		svw 0x0900042C inadr
+		lcs j 0
+		mov outptr outadr
+		lm_d k0, kptr
+		lm_d k1, kptr
+		whileu j < wxh {
+			lw b0 badr
+			
+			wait_wnd
+			simd_mac16_8 b0 k0 s8
+			nop
+			simd_mac16_8 b0 k1 s9
+			img_data_rd	// 读取下一个窗口
+
+			leaky b0 b0 10
+			ssl outptr b0
+
+			inc j 1
+		}
+		inc inadr whx2
+		inc outadr 2
+		inc badr 4
+		inc i 1
+	}
+	$jump_regs end
+
+	// ptr0 偏移值写回0
+	svw 0x09000058 0
+	nop
+}

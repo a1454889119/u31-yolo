@@ -1,0 +1,40 @@
+
+#include "memory.upinc"
+
+//#define LAYER_PARAM_ADDR (KERNEL_ADDR_P1_END - 64)
+// 16个参数, 64个字节
+#define INPUT_ADDR_OFF 0
+#define OUTPUT_ADDR_OFF 4
+#define KERNEL_ADDR_OFF 8
+#define BIAS_ADDR_OFF 12
+
+#define SCALE_OFF 16
+#define ZERO_POINT_OFF 20
+#define MUL_SHIFT_OFF 24
+#define PAD_VALUE_OFF 28
+#define OUTPUT_ADDR2_OFF 28
+
+#define INW_OFF 32
+#define TEMP_CHANNEL_ADDR 32
+#define INPUT_ADDR2_OFF 32
+#define INH_OFF 36
+#define INC_OFF 40
+#define IN_STRIDE_OFF 44
+
+#define OUTW_OFF 48
+#define OUTH_OFF 52
+#define OUTC_OFF 56
+#define OUT_STRIDE_OFF 60
+
+#define MAX_TARGET_COUNT 42 // (1024-4)/24
+//#define TARGETS_ADDR (LAYER_PARAM_ADDR - 1024)
+
+#define MAX_TMP_TARGET_COUNT 107 // (1024-4-160)/8
+//#define TMP_TARGET_ADDR (TARGETS_ADDR - 1024)
+//#define DEC_RECT_ADDR (TMP_TARGET_ADDR + 1024 - 160)
+
+#define SCORE_THRES (-1124)
+#define MAX_TARGET_PER_CLASS 2
+#define SCORE_TARGET_SIZE 12 // 4+2*4 得分用4个字节存,保证4字节对齐
+
+

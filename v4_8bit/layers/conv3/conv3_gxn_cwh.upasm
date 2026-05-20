@@ -1,0 +1,573 @@
+#include layer_param.upinc
+#include layer_regs.upinc
+
+#define k0 s0
+#define k1 s1
+#define ktmp s12
+#define kscale s13
+#define kzero_point s14
+
+#define b_03 s4
+#define b_47 s5
+#define b0 s4_0
+#define b1 s4_1
+#define b2 s4_2
+#define b3 s4_3
+#define b4 s5_0
+#define b5 s5_1
+#define b6 s5_2
+#define b7 s5_3	
+
+#define kptr ptr1
+#define bptr ptr2
+#define tmpptr ptr3
+
+#define w outw
+#define h outh
+#define c outc
+#define wxh outwxh
+#define outs outstride
+
+#define i r18
+#define j r19
+#define inwxh r20
+#define bias r21
+
+#define rj0 r22
+#define rj1 r23
+
+
+#define CONV9_NO_LEAKY(res)\
+wait_wnd;\
+simd_mac16_8 res k0 s8;\
+nop;\
+simd_mac16_8 res k1 s9;\
+img_data_rd;\
+nop;
+
+#define CONV9_LEAKY(res)\
+wait_wnd;\
+simd_mac16_8 res k0 s8;\
+nop;\
+simd_mac16_8 res k1 s9;\
+img_data_rd;\
+leaky res res layer_mulshift;\
+i32tof32 res res 31;
+
+
+@export conv3_gxn_cwh
+conv3_gxn_cwh:
+	mov kptr kadr
+	mov bptr badr
+	simd_ext32 kscale layer_scale
+	simd_ext32 kzero_point layer_zeropt
+	// 设置ptr0偏移值为outs
+	lcs j 0x10000
+	or i outs j
+	svw 0x09000058, i
+	// 设置VDMA参数
+	svw 0x0900040c layer_padv	
+	svw 0x09000414 0x01331100
+	lc i 0x50000000		
+	or i i w
+	svw 0x09000424 i	
+	sl i w 16
+	or i i h
+	svw 0x09000418 i
+	svw 0x0900041C 0x00000000
+	svw 0x09000420 wxh
+
+	ifu nFlag == 2 {
+		lcs i 0
+		$jump_regs rj0 rj1
+		whileu i < c {
+			svw 0x0900042C inadr
+			lcs j 0
+			mov outptr outadr
+			lm_d k0, kptr
+			lm_d k1, kptr
+			lw bias bptr
+			mov tmpptr outadr2
+			whileu j < wxh {
+				simd_ext32 b_03 bias
+				simd_ext32 b_47 bias
+
+				//CONV9_NO_LEAKY(b0)
+				wait_wnd
+				simd_mac16_8 b0 k0 s8
+				nop
+				simd_mac16_8 b0 k1 s9
+				img_data_rd
+				nop
+				CONV9_NO_LEAKY(b1)
+				CONV9_NO_LEAKY(b2)
+				CONV9_NO_LEAKY(b3)
+				CONV9_NO_LEAKY(b4)
+				CONV9_NO_LEAKY(b5)
+				CONV9_NO_LEAKY(b6)
+				CONV9_NO_LEAKY(b7)
+
+				sm tmpptr b_03
+				sm tmpptr b_47
+				inc j 8
+			}
+
+			inc inadr wxh
+			
+			svw 0x0900042C inadr
+			mov tmpptr outadr2
+			lm_d k0, kptr
+			lm_d k1, kptr
+			lcs j 0
+			whileu j < wxh {
+				lm_d b_03 tmpptr
+				lm_d b_47 tmpptr
+
+				//CONV9_LEAKY(b0)
+				wait_wnd
+				simd_mac16_8 b0 k0 s8
+				nop
+				simd_mac16_8 b0 k1 s9
+				img_data_rd
+				leaky b0 b0 layer_mulshift
+				i32tof32 b0 b0 31
+				CONV9_LEAKY(b1)
+				CONV9_LEAKY(b2)
+				CONV9_LEAKY(b3)
+				CONV9_LEAKY(b4)
+				CONV9_LEAKY(b5)
+				CONV9_LEAKY(b6)
+				CONV9_LEAKY(b7)
+
+				simd_fmul b_03 b_03 kscale
+				simd_fmul b_47 b_47 kscale
+		
+				simd_fsub b_03 b_03 kzero_point
+				simd_fsub b_47 b_47 kzero_point
+
+				// 浮点数round
+				simd_f32i32 ktmp b_03 30
+				simd_f32i32 b_03 b_03 31
+				simd_sub32 b_03 ktmp b_03
+				simd_f32i32 ktmp b_47 30
+				simd_f32i32 b_47 b_47 31
+				simd_sub32 b_47 ktmp b_47
+
+				sbyte outptr b0
+				sbyte outptr b1
+				sbyte outptr b2
+				sbyte outptr b3
+				sbyte outptr b4
+				sbyte outptr b5
+				sbyte outptr b6
+				sbyte outptr b7
+
+				inc j 8
+			}
+	
+			inc inadr wxh
+			inc outadr 1
+			inc i 1
+		}
+		$jump_regs end
+	} else {
+		// nFlag == 3
+		lcs i 0
+		$jump_regs rj0 rj1
+		whileu i < c {
+			svw 0x0900042C inadr
+			lcs j 0
+			mov outptr outadr
+			lm_d k0, kptr
+			lm_d k1, kptr
+			lw bias bptr
+			mov tmpptr outadr2
+			whileu j < wxh {
+				simd_ext32 b_03 bias
+				simd_ext32 b_47 bias
+
+				//CONV9_NO_LEAKY(b0)
+				wait_wnd
+				simd_mac16_8 b0 k0 s8
+				nop
+				simd_mac16_8 b0 k1 s9
+				img_data_rd
+				nop
+				CONV9_NO_LEAKY(b1)
+				CONV9_NO_LEAKY(b2)
+				CONV9_NO_LEAKY(b3)
+				CONV9_NO_LEAKY(b4)
+				CONV9_NO_LEAKY(b5)
+				CONV9_NO_LEAKY(b6)
+				CONV9_NO_LEAKY(b7)
+
+				sm tmpptr b_03
+				sm tmpptr b_47
+				inc j 8
+			}
+
+			inc inadr wxh
+			svw 0x0900042C inadr
+			lcs j 0
+			mov outptr outadr
+			lm_d k0, kptr
+			lm_d k1, kptr
+			mov tmpptr outadr2
+			whileu j < wxh {
+				lm_d b_03 tmpptr
+				lm_d b_47 tmpptr
+				sub tmpptr tmpptr 32
+
+				//CONV9_NO_LEAKY(b0)
+				wait_wnd
+				simd_mac16_8 b0 k0 s8
+				nop
+				simd_mac16_8 b0 k1 s9
+				img_data_rd
+				nop
+				CONV9_NO_LEAKY(b1)
+				CONV9_NO_LEAKY(b2)
+				CONV9_NO_LEAKY(b3)
+				CONV9_NO_LEAKY(b4)
+				CONV9_NO_LEAKY(b5)
+				CONV9_NO_LEAKY(b6)
+				CONV9_NO_LEAKY(b7)
+
+				sm tmpptr b_03
+				sm tmpptr b_47
+				inc j 8
+			}
+
+
+			inc inadr wxh
+			svw 0x0900042C inadr
+			mov tmpptr outadr2
+			lm_d k0, kptr
+			lm_d k1, kptr
+			lcs j 0
+			whileu j < wxh {
+				lm_d b_03 tmpptr
+				lm_d b_47 tmpptr
+
+				//CONV9_LEAKY(b0)
+				wait_wnd
+				simd_mac16_8 b0 k0 s8
+				nop
+				simd_mac16_8 b0 k1 s9
+				img_data_rd
+				leaky b0 b0 layer_mulshift
+				i32tof32 b0 b0 31
+				CONV9_LEAKY(b1)
+				CONV9_LEAKY(b2)
+				CONV9_LEAKY(b3)
+				CONV9_LEAKY(b4)
+				CONV9_LEAKY(b5)
+				CONV9_LEAKY(b6)
+				CONV9_LEAKY(b7)
+
+				simd_fmul b_03 b_03 kscale
+				simd_fmul b_47 b_47 kscale
+		
+				simd_fsub b_03 b_03 kzero_point
+				simd_fsub b_47 b_47 kzero_point
+
+				// 浮点数round
+				simd_f32i32 ktmp b_03 30
+				simd_f32i32 b_03 b_03 31
+				simd_sub32 b_03 ktmp b_03
+				simd_f32i32 ktmp b_47 30
+				simd_f32i32 b_47 b_47 31
+				simd_sub32 b_47 ktmp b_47
+
+				sbyte outptr b0
+				sbyte outptr b1
+				sbyte outptr b2
+				sbyte outptr b3
+				sbyte outptr b4
+				sbyte outptr b5
+				sbyte outptr b6
+				sbyte outptr b7
+
+				inc j 8
+			}
+	
+			inc inadr wxh
+			inc outadr 1
+			inc i 1
+		}
+		$jump_regs end
+	}
+	// ptr0 偏移值写回0
+	svw 0x09000058 0
+	ret
+
+
+/*
+#define outptr ptr0
+
+$func conv3_gxn_cwh(in nn) {
+	reg i, j, bias, inadr, outadr, w, h, wxh, c, outs, tmpadr
+	reg scale, zero_pt, mulshift, gxn
+	reg rj0, rj1
+	reg param_ptr(rj0), padv(rj1)
+
+	lc param_ptr, LAYER_PARAM_ADDR
+	lw inadr param_ptr, INPUT_ADDR_OFF
+	lw outadr param_ptr, OUTPUT_ADDR_OFF
+	lw tmpadr param_ptr, TEMP_CHANNEL_ADDR
+	lw kptr param_ptr, KERNEL_ADDR_OFF
+	lw bptr param_ptr, BIAS_ADDR_OFF
+	lw scale param_ptr, SCALE_OFF
+	lw zero_pt param_ptr, ZERO_POINT_OFF
+	lw mulshift param_ptr, MUL_SHIFT_OFF
+	lw padv param_ptr, PAD_VALUE_OFF
+	lw w param_ptr, OUTW_OFF
+	lw h param_ptr, OUTH_OFF
+	lw c param_ptr, OUTC_OFF
+	lw outs param_ptr, OUT_STRIDE_OFF
+
+	load_reg gxn nn
+	muls16 wxh w h
+	simd_ext32 kscale scale
+	simd_ext32 kzero_point zero_pt
+	// 设置ptr0偏移值为outs
+	lcs j 0x10000
+	or i outs j
+	svw 0x09000058, i
+	// 设置VDMA参数
+	svw 0x0900040c padv	
+	svw 0x09000414 0x01331100
+	lc i 0x50000000		
+	or i i w
+	svw 0x09000424 i	
+	sl i w 16
+	or i i h
+	svw 0x09000418 i
+	svw 0x0900041C 0x00000000
+	svw 0x09000420 wxh
+
+	ifu gxn == 2 {
+		lcs i 0
+		$jump_regs rj0 rj1
+		whileu i < c {
+			svw 0x0900042C inadr
+			lcs j 0
+			mov outptr outadr
+			lm_d k0, kptr
+			lm_d k1, kptr
+			lw bias bptr
+			mov tmpptr tmpadr
+			whileu j < wxh {
+				simd_ext32 b_03 bias
+				simd_ext32 b_47 bias
+
+				//CONV9_NO_LEAKY(b0)
+				wait_wnd
+				simd_mac16_8 b0 k0 s8
+				nop
+				simd_mac16_8 b0 k1 s9
+				img_data_rd
+				nop
+				CONV9_NO_LEAKY(b1)
+				CONV9_NO_LEAKY(b2)
+				CONV9_NO_LEAKY(b3)
+				CONV9_NO_LEAKY(b4)
+				CONV9_NO_LEAKY(b5)
+				CONV9_NO_LEAKY(b6)
+				CONV9_NO_LEAKY(b7)
+
+				sm tmpptr b_03
+				sm tmpptr b_47
+				inc j 8
+			}
+
+			inc inadr wxh
+			
+			svw 0x0900042C inadr
+			mov tmpptr tmpadr
+			lm_d k0, kptr
+			lm_d k1, kptr
+			lcs j 0
+			whileu j < wxh {
+				lm_d b_03 tmpptr
+				lm_d b_47 tmpptr
+
+				//CONV9_LEAKY(b0)
+				wait_wnd
+				simd_mac16_8 b0 k0 s8
+				nop
+				simd_mac16_8 b0 k1 s9
+				img_data_rd
+				leaky b0 b0 mulshift
+				i32tof32 b0 b0 31
+				CONV9_LEAKY(b1)
+				CONV9_LEAKY(b2)
+				CONV9_LEAKY(b3)
+				CONV9_LEAKY(b4)
+				CONV9_LEAKY(b5)
+				CONV9_LEAKY(b6)
+				CONV9_LEAKY(b7)
+
+				simd_fmul b_03 b_03 kscale
+				simd_fmul b_47 b_47 kscale
+		
+				simd_fsub b_03 b_03 kzero_point
+				simd_fsub b_47 b_47 kzero_point
+
+				// 浮点数round
+				simd_f32i32 ktmp b_03 30
+				simd_f32i32 b_03 b_03 31
+				simd_sub32 b_03 ktmp b_03
+				simd_f32i32 ktmp b_47 30
+				simd_f32i32 b_47 b_47 31
+				simd_sub32 b_47 ktmp b_47
+
+				sbyte outptr b0
+				sbyte outptr b1
+				sbyte outptr b2
+				sbyte outptr b3
+				sbyte outptr b4
+				sbyte outptr b5
+				sbyte outptr b6
+				sbyte outptr b7
+
+				inc j 8
+			}
+	
+			inc inadr wxh
+			inc outadr 1
+			inc i 1
+		}
+		$jump_regs end
+	} else {
+		// gxn == 3
+		lcs i 0
+		$jump_regs rj0 rj1
+		whileu i < c {
+			svw 0x0900042C inadr
+			lcs j 0
+			mov outptr outadr
+			lm_d k0, kptr
+			lm_d k1, kptr
+			lw bias bptr
+			mov tmpptr tmpadr
+			whileu j < wxh {
+				simd_ext32 b_03 bias
+				simd_ext32 b_47 bias
+
+				//CONV9_NO_LEAKY(b0)
+				wait_wnd
+				simd_mac16_8 b0 k0 s8
+				nop
+				simd_mac16_8 b0 k1 s9
+				img_data_rd
+				nop
+				CONV9_NO_LEAKY(b1)
+				CONV9_NO_LEAKY(b2)
+				CONV9_NO_LEAKY(b3)
+				CONV9_NO_LEAKY(b4)
+				CONV9_NO_LEAKY(b5)
+				CONV9_NO_LEAKY(b6)
+				CONV9_NO_LEAKY(b7)
+
+				sm tmpptr b_03
+				sm tmpptr b_47
+				inc j 8
+			}
+
+			inc inadr wxh
+			svw 0x0900042C inadr
+			lcs j 0
+			mov outptr outadr
+			lm_d k0, kptr
+			lm_d k1, kptr
+			mov tmpptr tmpadr
+			whileu j < wxh {
+				lm_d b_03 tmpptr
+				lm_d b_47 tmpptr
+				sub tmpptr tmpptr 32
+
+				//CONV9_NO_LEAKY(b0)
+				wait_wnd
+				simd_mac16_8 b0 k0 s8
+				nop
+				simd_mac16_8 b0 k1 s9
+				img_data_rd
+				nop
+				CONV9_NO_LEAKY(b1)
+				CONV9_NO_LEAKY(b2)
+				CONV9_NO_LEAKY(b3)
+				CONV9_NO_LEAKY(b4)
+				CONV9_NO_LEAKY(b5)
+				CONV9_NO_LEAKY(b6)
+				CONV9_NO_LEAKY(b7)
+
+				sm tmpptr b_03
+				sm tmpptr b_47
+				inc j 8
+			}
+
+
+			inc inadr wxh
+			svw 0x0900042C inadr
+			mov tmpptr tmpadr
+			lm_d k0, kptr
+			lm_d k1, kptr
+			lcs j 0
+			whileu j < wxh {
+				lm_d b_03 tmpptr
+				lm_d b_47 tmpptr
+
+				//CONV9_LEAKY(b0)
+				wait_wnd
+				simd_mac16_8 b0 k0 s8
+				nop
+				simd_mac16_8 b0 k1 s9
+				img_data_rd
+				leaky b0 b0 mulshift
+				i32tof32 b0 b0 31
+				CONV9_LEAKY(b1)
+				CONV9_LEAKY(b2)
+				CONV9_LEAKY(b3)
+				CONV9_LEAKY(b4)
+				CONV9_LEAKY(b5)
+				CONV9_LEAKY(b6)
+				CONV9_LEAKY(b7)
+
+				simd_fmul b_03 b_03 kscale
+				simd_fmul b_47 b_47 kscale
+		
+				simd_fsub b_03 b_03 kzero_point
+				simd_fsub b_47 b_47 kzero_point
+
+				// 浮点数round
+				simd_f32i32 ktmp b_03 30
+				simd_f32i32 b_03 b_03 31
+				simd_sub32 b_03 ktmp b_03
+				simd_f32i32 ktmp b_47 30
+				simd_f32i32 b_47 b_47 31
+				simd_sub32 b_47 ktmp b_47
+
+				sbyte outptr b0
+				sbyte outptr b1
+				sbyte outptr b2
+				sbyte outptr b3
+				sbyte outptr b4
+				sbyte outptr b5
+				sbyte outptr b6
+				sbyte outptr b7
+
+				inc j 8
+			}
+	
+			inc inadr wxh
+			inc outadr 1
+			inc i 1
+		}
+		$jump_regs end
+	}
+	// ptr0 偏移值写回0
+	svw 0x09000058 0
+	nop
+}
+*/

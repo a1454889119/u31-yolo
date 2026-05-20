@@ -1,0 +1,8 @@
+@import LAYER_8_OUTPUT
+@import LAYER_9_OUTPUT
+@import layer9_kernel
+$func conv3s1_leaky_cwh(in input, in output, in channles, in kernels, in dstw, in dsth, in outstride)
+
+entry:
+	conv3s1_leaky_cwh(LAYER_8_OUTPUT, LAYER_9_OUTPUT, 12, layer9_kernel, 40, 30, 24)
+	hlt

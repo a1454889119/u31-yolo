@@ -1,0 +1,210 @@
+#include layer_memory.upinc
+#include layer_param.upinc
+
+@import MEMORY
+
+#define tarptr ptr0
+#define uartptr ptr1
+#define count r0
+#define x0 r1
+#define y0 r2
+#define x1 r3
+#define y1 r4
+#define score r5
+#define type r6
+#define i r7
+#define len r8
+#define sum r9
+#define tmp r10
+
+#define tlow r10
+#define thigh r11
+#define ff r12
+
+#define cx s4_2
+#define cy s4_3
+#define tw s4_0
+#define th s4_1
+
+#if SORT_TARGETS == 0
+
+@export write_uart_pool
+write_uart_pool:
+	lc tarptr, TARGETS_ADDR
+	lcs uartptr, MEMORY
+	lw count tarptr
+
+	lcs ff 0xff
+	lcs tmp 0x0afe
+	ssl uartptr tmp	
+	sbyte uartptr count
+	mov sum count
+
+	lcs i 0
+	lcs len 1
+	whileu i < count {
+		lw_d type tarptr
+		lw_d score tarptr
+		lm_d s4 tarptr
+
+		sru score score 2 // score本来是0~1023,右移2位是0~255
+		
+		srs tw tw 1
+		srs th th 1
+
+		sub x0 cx tw
+		add x1 cx tw
+		sub y0 cy th
+		add y1 cy th
+
+		sru thigh x0 8
+		and tlow x0 ff
+		xor sum sum thigh
+		xor sum sum tlow
+		sbyte uartptr tlow
+		sbyte uartptr thigh
+
+		sru thigh y0 8
+		and tlow y0 ff
+		xor sum sum thigh
+		xor sum sum tlow
+		sbyte uartptr tlow
+		sbyte uartptr thigh
+
+		sru thigh x1 8
+		and tlow x1 ff
+		xor sum sum thigh
+		xor sum sum tlow
+		sbyte uartptr tlow
+		sbyte uartptr thigh
+
+		sru thigh y1 8
+		and tlow y1 ff
+		xor sum sum thigh
+		xor sum sum tlow
+		sbyte uartptr tlow
+		sbyte uartptr thigh
+
+		xor sum sum score
+		xor sum sum type
+		sbyte uartptr score
+		sbyte uartptr type
+
+		inc len, 10
+		inc i 1
+	}
+	sbyte uartptr sum
+	lcs tmp 0x55
+	sbyte uartptr tmp
+
+	inc len 4
+	sl len len 20
+	mov x0, len  //长度
+	lc y0, MEMORY //数据地址
+	or x0, x0, y0
+	svw 0x09000804, x0 //启动UART0发送
+	ret
+
+#else
+
+#define scores_adr r13
+#define j r15
+#define type_size r16
+#define type_scores_adr r17
+
+
+@import sort_target_scores
+
+@export write_uart_pool
+write_uart_pool:
+	// 获取平均亮度
+	lvw r0 0x09000324
+	lc r1, 320*160
+	divs32 r0 r0 r1
+	ifu r0 < BRIGHTNESS_LEVEL_LOW {
+		// 平均亮度太低,不发送检测结果
+		lcs uartptr, MEMORY
+		lcs tmp 0x0bfe
+		ssl uartptr tmp
+		sbyte uartptr r0 // 写平均亮度
+		sbyte uartptr r0 // 校验值
+		lcs tmp 0x55
+		sbyte uartptr tmp
+
+		lc x0, (5<<20)|MEMORY  // (长度<<20)|地址
+		svw 0x09000804, x0 //启动UART0发送
+		ret
+	}
+
+	push rp
+	call sort_target_scores
+
+	lc scores_adr, IMAGE_ADDR
+	lcs uartptr, MEMORY
+	lcs type_size, MAX_TARGET_PER_CLASS*SCORE_TARGET_SIZE
+	lw count tarptr
+
+	lcs tmp 0x0afe
+	ssl uartptr tmp
+	lcs count 0
+	lcs sum 0
+	sbyte uartptr 0 // count的位置临时填0
+	//sbyte uartptr count
+	//mov sum count
+
+	lcs type 0
+	lcs len 1
+	whileu type < NUM_CLASSES {		
+		lcs i 0
+		whileu i < type_size {
+			lw score scores_adr i
+			ifu score == 0 {
+				break
+			}
+
+			lcs j 4
+			whileu j < SCORE_TARGET_SIZE {
+				add tmp i j
+				lbyte tmp scores_adr tmp
+				xor sum sum tmp
+				sbyte uartptr tmp
+				inc j 1
+			}
+			xor sum sum type
+			xor sum sum score
+			sbyte uartptr score
+			sbyte uartptr type
+	
+			inc len 10
+			inc count 1
+			inc i SCORE_TARGET_SIZE
+
+			// type0只保留1个目标
+			ifu type == 0 {
+				break
+			}
+		}
+		inc scores_adr, type_size
+		inc type 1
+	}
+	xor sum sum count
+	sbyte uartptr sum
+	lcs tmp 0x55
+	sbyte uartptr tmp
+
+	// 写count
+	lcs tmp, MEMORY + 2
+	sbyte tmp count
+
+	inc len 4
+	sl len len 20
+	mov x0, len  //长度
+	lc y0, MEMORY //数据地址
+	or x0, x0, y0
+	svw 0x09000804, x0 //启动UART0发送
+	nop
+	
+	pop rp
+	ret
+
+#endif

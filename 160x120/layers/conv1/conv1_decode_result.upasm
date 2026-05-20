@@ -1,0 +1,351 @@
+
+#define outptr ptr0
+#define inptr ptr1
+#define kptr ptr2
+#define bptr ptr3
+
+
+#define SCORE_THRES -633
+#define MAX_TMP_RECT 32
+
+@export temp_target_count
+temp_target_count:
+.reserve 4 // count
+.align 16
+temp_target:
+.reserve 8*MAX_TMP_RECT // type/score/x/y
+
+DEC_RECT_ADDR:
+.reserve 160
+
+$func conv1_decode_score(in input, in width, in height, in channels, in kernels) {
+	reg x, y, type, t, w, h, c, score, score_max
+	reg score_thres, kadr, badr, count
+	reg rj0, rj1, rj2, rj3, rj4, rjend
+	
+	lcs rjend end_score
+	lc score_thres, SCORE_THRES
+	lc outptr temp_target
+
+	load_reg inptr input
+	load_reg kadr kernels
+	load_reg w width
+	load_reg h height
+	load_reg c channels
+	
+	muls32 badr c, 20*2
+	inc badr kadr
+
+	lcs count 0
+	svw temp_target_count 0
+
+#define k0  s0
+#define k1  s1
+#define k2  d0
+#define in0 s2
+#define in1 s3
+#define in2 d1
+	$jump_regs rj0, rj1, rj2, rj3, rj4
+	lcs y 0
+	whileu y < h {
+		lcs x 0
+		whileu x < w {
+			mov kptr kadr
+			mov bptr badr
+			lcs t 0
+			lc type, -1
+			mov score_max score_thres
+			whileu t < c {
+				lw score bptr
+				lm_d  k0 kptr
+				lm_d  in0 inptr
+				simd_mac16_8 score k0 in0
+
+				lm_d  k1 kptr
+				lm_d  in1 inptr
+				simd_mac16_8 score k1 in1
+
+				l64_d k2 kptr
+				l64_d in2 inptr
+				simd_mac16_4 score k2 in2
+
+				nop
+				srs score score 10
+				ifs score > score_max {
+					mov score_max score
+					mov type t
+				}
+				inc t 1
+			}
+
+			ifs type >= 0 {
+				ssl outptr x
+				ssl outptr y
+				ssl outptr type
+				ssl outptr score				
+				inc count 1
+				cjmpuge rjend count MAX_TMP_RECT
+			}
+			inc x 1
+		}
+		inc y 1
+	}
+	$jump_regs end
+#undef k0 
+#undef k1 
+#undef k2 
+#undef in0
+#undef in1
+#undef in2
+
+end_score:
+	svw temp_target_count count
+	nop
+}
+
+#define b_03 s4
+#define b0 s4_0
+#define b1 s4_1
+#define b2 s4_2
+#define b3 s4_3
+
+#define k0_0 s0
+#define k0_1 s1
+#define k1_0 s2
+#define k1_1 s3
+#define k2_0 s10
+#define k2_1 s11
+
+#define in0 s8
+#define in1 s9
+
+#define k0_2 d0
+#define k1_2 d1
+#define k2_2 d2
+#define in2 d3
+#define tarptr ptr4
+#define softmul s12
+
+#define soft2 s4_0
+#define soft3 s4_1
+#define soft4 s4_2
+#define soft5 s4_3
+#define soft6 s5_0
+#define soft7 s5_1
+#define soft8 s5_2
+#define soft9 s5_3
+
+softmul_data:
+.short 2 3 4 5 6 7 8 9
+
+$func check_rect_nmls()
+
+$func conv1_decode_rect(in input, in width, in height, in scale, in kernels) {
+	reg x, y, w, h, kadr, badr, inadr
+	reg count, idx, i, j, exp_k, s
+	reg sum, soft0, soft1, float_1024
+	reg out0, out1, out2, out3
+
+	jmp rect_start
+
+softmax_10:
+	mov sum soft0
+	inc sum soft1
+	inc sum soft2
+	inc sum soft3
+	inc sum soft4
+	inc sum soft5
+	inc sum soft6
+	inc sum soft7
+	inc sum soft8
+	inc sum soft9
+
+	i32tof32 sum sum 31;
+	fdiv sum float_1024 sum;
+	i32tof32 soft0 soft0 31;
+	i32tof32 soft1 soft1 31;
+	simd_i32f32 s4 s4 31
+	simd_i32f32 s5 s5 31
+	fmul soft0 sum soft0
+	fmul soft1 sum soft1
+	simd_ext32 s6 sum
+	simd_fmul s4 s4 s6
+	simd_fmul s5 s5 s6
+	f32toi32 soft1 soft1 31
+	//nop
+	simd_f32i32 s4 s4 31
+	simd_f32i32 s5 s5 31
+	simd_32to16 s6_01 s4 0
+	simd_32to16 s6_23 s5 0
+	ret
+
+rect_start:
+	lcs exp_k 1477			// log2(e):  1.442695*(2^10)
+	lcs badr, 40*20*2
+	lcs float_1024, 1024.0
+	load_reg inadr input
+	load_reg kadr kernels
+	load_reg w width
+	load_reg h height
+	load_reg s scale
+
+	lcs x softmul_data
+	lm softmul x
+	
+	inc badr kadr
+	lvw count temp_target_count
+	lc tarptr temp_target
+
+	lcs i 0
+	whileu i < count {
+		lsl x tarptr
+		lsl y tarptr
+		// idx = y*w+x
+		muls16 idx y w
+		inc idx x
+
+		// kptr = inadr + idx*20*2
+		muls16 kptr idx 40
+		inc kptr inadr
+		lc outptr DEC_RECT_ADDR
+
+		lm_d in0 kptr
+		lm_d in1 kptr
+		l64_d in2 kptr
+		
+		mov kptr kadr
+		mov bptr badr
+		simd_8to16 s7 s7_01
+
+		// 卷积运算
+		lcs j 0
+		whileu j < 40 {
+			lm_d  b_03 bptr
+			lm_d  k0_0 kptr
+			lm_d  k0_1 kptr
+			l64_d  k0_2 kptr
+			lm_d  k1_0 kptr
+			lm_d  k1_1 kptr
+			l64_d  k1_2 kptr
+			lm_d  k2_0 kptr
+			lm_d  k2_1 kptr
+			l64_d  k2_2 kptr
+			simd_mac16_8 b0 k0_0 in0
+			lm_d  k0_0 kptr
+			simd_mac16_8 b3 k0_0 in0
+			simd_mac16_8 b1 k1_0 in0
+			simd_mac16_8 b2 k2_0 in0
+
+			simd_mac16_8 b0 k0_1 in1
+			lm_d  k0_1 kptr
+			simd_mac16_8 b3 k0_1 in1
+			simd_mac16_8 b1 k1_1 in1
+			simd_mac16_8 b2 k2_1 in1
+
+			simd_mac16_4 b0 k0_2 in2
+			l64_d  k0_2 kptr
+			simd_mac16_4 b3 k0_2 in2
+			simd_mac16_4 b1 k1_2 in2
+			simd_mac16_4 b2 k2_2 in2
+
+			//muls32 b0 b0 exp_k;
+			//sl b0 b0 4;
+			//exp2_m16p16 b0 b0;
+			//srs b0 b0 6;
+
+
+#define exp_m22p10_rs10(v) \
+srs v v 10;\
+muls32 v v exp_k;\
+sl v v 4;\
+exp2_m16p16 v v;\
+srs v v 6;
+			
+			exp_m22p10_rs10(b0)
+			exp_m22p10_rs10(b1)
+			//muls32 b1 b1 exp_k;
+			//srs b1 b1 6;
+			//exp2_m16p16 b1 b1;
+			//srs b1 b1 6;
+
+			exp_m22p10_rs10(b2)
+			exp_m22p10_rs10(b3)
+#undef exp_m22p10_rs10
+			inc j 4
+			sm outptr b_03
+		}
+
+		// 解析rect
+		lc kptr, DEC_RECT_ADDR
+		nop
+		lw_d soft0 kptr
+		lw_d soft1 kptr
+		lm_d s4 kptr
+		lm_d s5 kptr
+		call softmax_10
+		mov out0 soft1
+		simd_mac16_8 out0 s6 softmul
+
+		lw_d soft0 kptr
+		lw_d soft1 kptr
+		lm_d s4 kptr
+		lm_d s5 kptr
+		call softmax_10
+		mov out1 soft1
+		simd_mac16_8 out1 s6 softmul
+
+		lw_d soft0 kptr
+		lw_d soft1 kptr 
+		lm_d s4 kptr
+		lm_d s5 kptr
+		call softmax_10
+		mov out2 soft1
+		simd_mac16_8 out2 s6 softmul
+
+		lw_d soft0 kptr
+		lw_d soft1 kptr
+		lm_d s4 kptr
+		lm_d s5 kptr
+		call softmax_10
+		mov out3 soft1
+		simd_mac16_8 out3 s6 softmul
+
+		//out[0] = (x << 10) + 512 - out[0];  // w
+		//out[1] = (y << 10) + 512 - out[1];  // h
+		//out[2] = (x << 10) + 512 + out[2];
+		//out[3] = (y << 10) + 512 + out[3];
+		sl x x 10
+		sl y y 10
+		lcs j 512
+		inc x j
+		inc y j
+		sub out0 x out0
+		sub out1 y out1
+		add out2 x out2
+		add out3 y out3
+
+		//tar.w = ((out[2] - out[0]) * scale);
+		//tar.h = ((out[3] - out[1]) * scale);
+		//tar.x = ((out[0] + out[2]) / 2 * scale);
+		//tar.y = ((out[1] + out[3]) / 2 * scale);
+		sub s5_0 out2 out0
+		sub s5_1 out3 out1
+		add s5_2 out0 out2
+		add s5_3 out1 out3
+		
+		muls32 s5_0 s5_0 s
+		muls32 s5_1 s5_1 s
+		muls32 s5_2 s5_2 s
+		muls32 s5_3 s5_3 s
+		srs s5_2 s5_2 1
+		srs s5_3 s5_3 1
+		nop
+		simd_shift32 s5 s5 10
+
+		lsl s4_0 tarptr
+		lsl s4_1 tarptr
+		check_rect_nmls()
+
+		inc i 1
+	}
+}

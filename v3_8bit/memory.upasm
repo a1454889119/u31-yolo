@@ -1,0 +1,40 @@
+@export MEMORY
+@export MEMORY_P0_END
+@export MEMORY_P1_END
+@export KERNEL_ADDR_P0
+@export KERNEL_ADDR_P0_END
+@export KERNEL_ADDR_P1
+@export KERNEL_ADDR_P1_END
+@export TARGETS_ADDR
+@export LAYER_PARAM_ADDR
+@export TMP_TARGET_ADDR
+@export DEC_RECT_ADDR
+
+.align 16
+MEMORY:
+.reserve 1024*200
+MEMORY_P0_END:
+
+// 其余层的kernel地址
+KERNEL_ADDR_P0:
+.reserve 1024*25
+MEMORY_P1_END:
+KERNEL_ADDR_P0_END:
+
+// 前14层/50层的kernel地址
+KERNEL_ADDR_P1:	
+.reserve 1024*4
+KERNEL_ADDR_P1_END:
+
+TARGETS_ADDR:
+.reserve 1024-64
+
+LAYER_PARAM_ADDR:
+.reserve 64
+
+TMP_TARGET_ADDR:
+.reserve 1024 - 160
+
+DEC_RECT_ADDR:
+.reserve 160
+

@@ -1,0 +1,31 @@
+//---------------LAYER 25(conv)-------------
+//input:22x11x8
+//output:22x11x40
+//k1s1p0,group=1
+//leaky
+// output:whc
+#include "layers_common.upinc"
+
+
+@import conv_k1_i8o40_params
+@import conv_k1_i8o40_whc
+
+@export layer_25
+layer_25:
+	sv layer_rp_adr0 rp
+	//conv_k1_i8o40_params:
+	//.word 0 // wh_x2
+	//.word 0 // input_adr
+	//.word 0 // output_adr
+	//.word 0 // kernel_adr
+	//.word 0 // bias_adr
+	lcs ptr0 conv_k1_i8o40_params
+	sv ptr0 484 // 22*11*2
+	svw ptr0 layer_24_output
+	svw ptr0 layer_25_output
+	sw  ptr0 kernel_addr
+	sw  ptr0 bias_addr
+	call conv_k1_i8o40_whc
+
+	lv rp layer_rp_adr0
+	ret

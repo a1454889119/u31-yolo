@@ -1,0 +1,9 @@
+@import LAYER_36_OUTPUT
+@import LAYER_37_OUTPUT
+@import layer37_kernel
+
+$func conv1_24inout_1x1_sigmoid(in input, in output, in kernels)
+
+entry:
+	conv1_24inout_1x1_sigmoid(LAYER_36_OUTPUT, LAYER_37_OUTPUT, layer37_kernel)
+	hlt

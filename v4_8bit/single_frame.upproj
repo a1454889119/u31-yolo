@@ -1,0 +1,38 @@
+#BUILD-INFO
+TYPE=APP
+NAME=single_frame
+CFG=u31
+ENTRY_NAME=entry
+#OTA_LENGTH=0x4410
+
+#DEBUG-INFO
+DEBUG_TYPE=IIC
+SIMULATE_DATA=simdata
+
+#OUTPUT-INFO
+PATH=out
+BIN=true
+HEX=true
+MAP=false
+OBJS=false
+
+#FILES
+[ext]upinc
+[ext]upasm
+
+#EXCLUDE
+[dir]out
+[dir]cmos
+
+#MACROS
+#define MEMORY_DATA_SIZE (1024*225)
+#define KERNEL_DATA_SIZE (1024*17)
+#define SORT_TARGETS 0
+#define OTA_ENABLE 0
+#define FACEPALM_3_CLASSES			 1
+
+#DOWNLOAD
+facepalm_320x160.bin -> MEMORY
+
+#GENERATION
+PREFIX=u31_sys

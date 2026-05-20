@@ -1,0 +1,4 @@
+@export MEMORY
+.align 16
+MEMORY:
+.reserve 186880

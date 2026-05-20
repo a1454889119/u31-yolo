@@ -1,0 +1,76 @@
+
+#define PSRAM_64M 0
+
+#if PSRAM_64M
+@import init_psram
+#else
+@import psram_init_APS3208K
+#endif
+@import layer0_input_psram_adr
+@import yolo_run_frame
+
+$func spi_read_frame(in frame_adr)
+$func spi_write_result()
+
+entry:
+	//---------------------------------------------------------------------------- 
+	//clk_initial
+	//----------------------------------------------------------------------------
+
+#if !PSRAM_64M
+	svw 0x09000000, 0x112403a0
+	svw 0x09000008, 0x00124006
+    svw 0x09000500,0x1a000
+    svw 0x09000504,0x103
+	//key init,用于跟PC同步
+	svw 0x09000b00,0x11
+	svw 0x09000b04,0x10
+	svw 0x09000b10,1 //上下拉使能
+	svw 0x09000b18,0 //下拉
+	svw 0x09000a58,1
+	svw 0x09000a54,8000
+	svw 0x09000b0c,0
+
+	call psram_init_APS3208K
+#else
+	call init_psram
+	//svw 0x09000000, 0x13021454
+	//svw 0x09000008, 0x10404066
+	// spi_init
+	svw 0x09000008, 0x00124006
+    svw 0x09000500,0x1a000
+    svw 0x09000504,0x103
+	//key init,用于跟PC同步
+	svw 0x09000b00,0x11
+	svw 0x09000b04,0x10
+	svw 0x09000b10,1 //上下拉使能
+	svw 0x09000b18,0 //下拉
+	svw 0x09000a58,1
+	svw 0x09000a54,8000
+	svw 0x09000b0c,0
+#endif
+
+
+#if SIMULATE == 1
+#var PSRAM_WRITE_CODE 0
+#set_bits PSRAM_WRITE_CODE 31 24 0x80 	// [31:24]  spi_cmd       //SPI指令码, 写0x09000610启动一次读、写  
+#set_bits PSRAM_WRITE_CODE 23 23 1 		// [23]     spi_wr        //1:write, 0:read  
+	svw 0x09000608, 0
+	svw 0x0900060c, 0x7000
+	lc r0 PSRAM_WRITE_CODE
+	lc r1 154176
+	or r0 r0 r1
+	sv 0x09000610, r0
+	sv 0x09000620 1
+	wait_psram
+#endif
+
+	svw layer0_input_psram_adr PSRAM_LAYER_0_INPUT
+loop_sta:
+	wait_key
+	
+	spi_read_frame(PSRAM_LAYER_0_INPUT)
+	call yolo_run_frame
+	spi_write_result()
+
+	jmp loop_sta

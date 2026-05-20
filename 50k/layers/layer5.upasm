@@ -1,0 +1,140 @@
+//---------------LAYER 5(conv)-------------
+//input:44x22x18
+//output:44x22x8
+//k1s1p0,group=1
+//linear
+// 44x22x18=>44x22x8 1x1卷积, linear, 输入cwh 输出cwh
+#include "layers_common.upinc"
+
+#define wh r3
+#define wh_x2 r4
+#define wh_x4 r5
+#define wh_x6 r6
+#define wh_x16 r7
+
+#define input_end r8
+#define input_start r9
+
+#define bias_ptr r10
+
+
+#define res0 r11
+#define res1 r12
+#define res2 r13
+
+#define i r14
+#define output_ptr r15
+#define output_start r16
+#define input_ptr r17
+
+#define k0_0 s0
+#define k0_1 s1
+#define k0_2 s2
+#define k1_0 s3
+#define k1_1 s5
+#define k1_2 s6
+#define k2_0 s7
+#define k2_1 s8
+#define k2_2 s9
+#define k3_0 s10
+#define k3_1 s11
+#define k3_2 s12
+
+#define in_0 s13
+#define in_1 s14
+#define in_2 s15
+
+#define br0 s4
+#define br0_0 s4_0
+#define br0_1 s4_1
+#define br0_2 s4_2
+#define br0_3 s4_3
+
+#define kernel_ptr ptr1
+
+@export layer_5
+layer_5:
+
+	lcs wh 968 // 44*22
+	sl wh_x2 wh 1
+	sl wh_x4 wh 2
+	sl wh_x16 wh 4
+	add wh_x6 wh_x2 wh_x4
+
+	lc input_ptr layer_4_output
+	lc output_ptr layer_5_output
+
+	mov output_start output_ptr
+	mov input_start input_ptr
+	// input_end = input_start + wh*36
+	add input_end input_start wh_x16
+	inc input_end wh_x16
+	inc input_end wh_x4
+
+	mov bias_ptr bias_addr
+	mov kernel_ptr kernel_addr
+
+	//lm s0 kernel_ptr
+	//lm s1 input_ptr
+	//lm s13 input_ptr
+	//
+	//mov r30 0
+	//mov r31 0
+	//simd_mac16_8 r30 s0 s1
+	//simd_mac16_8 r31 s0 s13
+
+	lcs i 0
+	$jump_regs r20 r21 r22
+	// 2轮, 每轮得到4个输出通道
+	whileu i < 2 {
+		lm k0_0 kernel_ptr
+		lm k0_1 kernel_ptr
+		lm k0_2 kernel_ptr
+		lm k1_0 kernel_ptr
+		lm k1_1 kernel_ptr
+		lm k1_2 kernel_ptr
+		lm k2_0 kernel_ptr
+		lm k2_1 kernel_ptr
+		lm k2_2 kernel_ptr
+		lm k3_0 kernel_ptr
+		lm k3_1 kernel_ptr
+		lm k3_2 kernel_ptr
+
+		mov input_ptr input_start
+		mov output_ptr output_start
+
+		whileu input_ptr < input_end {
+			lm br0 bias_ptr
+			lm in_0 input_ptr 0
+			lm in_1 input_ptr 16	
+			lm in_2 input_ptr 32
+
+			simd_mac16_8 br0_0 k0_0 in_0
+			simd_mac16_8 br0_1 k1_0 in_0
+			simd_mac16_8 br0_2 k2_0 in_0
+			simd_mac16_8 br0_3 k3_0 in_0
+
+			simd_mac16_8 br0_0 k0_1 in_1
+			simd_mac16_8 br0_1 k1_1 in_1
+			simd_mac16_8 br0_2 k2_1 in_1
+			simd_mac16_8 br0_3 k3_1 in_1
+
+			simd_mac16_8 br0_0 k0_2 in_2
+			simd_mac16_8 br0_1 k1_2 in_2
+			simd_mac16_8 br0_2 k2_2 in_2
+			simd_mac16_8 br0_3 k3_2 in_2
+
+			inc input_ptr 36
+			nop
+			nop
+			
+			simd_linear d0 br0 10
+			inc output_ptr 16
+			
+			s64 output_ptr d0, -16
+		}
+		inc bias_ptr 16
+		inc output_start 8
+		inc i 1
+	}
+	ret

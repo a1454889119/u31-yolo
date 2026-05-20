@@ -1,0 +1,11 @@
+
+
+#if POOL_4_CLASSES == 1
+#include weights_flash_pool4class.upinc
+#include quant_param_pool4class.upinc
+#endif
+
+#if FACEPALM_3_CLASSES == 1
+#include weights_flash_facepalm3class.upinc
+#include quant_param_facepalm3class.upinc
+#endif

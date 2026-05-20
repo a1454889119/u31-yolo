@@ -1,0 +1,305 @@
+#include layer_param.upinc
+
+@import yolo_run_part1
+@import yolo_run_part2
+@import yolo_run_part3
+@import TARGETS_ADDR
+
+@import KALMAN_BBOX
+$func KalmanTracker_Reset(in _cx, in _cy, in width, in height)
+$func KalmanTracker_Predict()
+$func KalmanTracker_Update(in _cx, in _cy, in width, in height)
+
+#define GUEST_OK 1
+#define GUEST_STOP 2
+#define GUEST_PALM 3
+
+TARGET_TRACKED:
+.word 0
+
+TARGET_COUNT:
+.word 0
+
+TARGET_WITH_GUESTS:
+.reserve 20*MAX_TARGET_COUNT
+
+$func send_s4() {
+	// TODO: 发送s4(w,h,cx,cy) 整型
+#define uartptr ptr0
+	reg count, ff, tmp, sum
+	reg type score tw th x0 y0 x1 y1 thigh tlow len
+
+	lcs uartptr, MEMORY
+	lcs count 1
+
+	lcs ff 0xff
+	lcs tmp 0x0afe
+	ssl uartptr tmp	
+	sbyte uartptr count
+	mov sum count
+
+	lcs type 4
+	lcs score 0x80
+
+	srs tw s4_0 1
+	srs th s4_1 1
+
+	sub x0 s4_2 tw
+	add x1 s4_2 tw
+	sub y0 s4_3 th
+	add y1 s4_3 th
+
+	sru thigh x0 8
+	and tlow x0 ff
+	xor sum sum thigh
+	xor sum sum tlow
+	sbyte uartptr tlow
+	sbyte uartptr thigh
+
+	sru thigh y0 8
+	and tlow y0 ff
+	xor sum sum thigh
+	xor sum sum tlow
+	sbyte uartptr tlow
+	sbyte uartptr thigh
+
+	sru thigh x1 8
+	and tlow x1 ff
+	xor sum sum thigh
+	xor sum sum tlow
+	sbyte uartptr tlow
+	sbyte uartptr thigh
+
+	sru thigh y1 8
+	and tlow y1 ff
+	xor sum sum thigh
+	xor sum sum tlow
+	sbyte uartptr tlow
+	sbyte uartptr thigh
+
+	xor sum sum score
+	xor sum sum type
+	sbyte uartptr score
+	sbyte uartptr type
+
+	lcs len, 11
+	
+	sbyte uartptr sum
+	lcs tmp 0x55
+	sbyte uartptr tmp
+
+	inc len 4
+	sl len len 20
+	mov x0, len  //长度
+	lc y0, MEMORY //数据地址
+	or x0, x0, y0
+	svw 0x09000804, x0 //启动UART0发送
+	nop
+}
+
+$func send_kalman() {
+	reg addr
+	nop
+	lcs addr KALMAN_BBOX
+	lm s5 addr
+	simd_f32i32 s5 s5 31
+	nop
+	add s4_2 s5_0 s5_2
+	srs s4_2 s4_2 1
+	add s4_3 s5_1 s5_3
+	srs s4_3 s4_3 1
+	sub s4_0 s5_2 s5_0
+	sub s4_1 s5_3 s5_1
+
+	send_s4()
+}
+
+
+#define target_status r0
+#define detect_count r1
+#define i r0
+#define target_count r2
+#define j r3
+#define tmp r4
+#define target_head r5
+#define best_match r5
+#define mindist r6
+#define stop_rj r7
+#define dx r8
+#define dy r9
+#define dist r10
+
+@export detect_track
+detect_track:
+	push rp
+	lv target_status TARGET_TRACKED
+	ifu target_status == 0 {
+		call yolo_run_part1
+		call yolo_run_part2
+		call yolo_run_part3
+		simd_ext32 s4 0
+		send_s4()
+	} else {
+		call yolo_run_part1
+		KalmanTracker_Predict()
+		send_kalman()
+
+		call yolo_run_part2
+		KalmanTracker_Predict()
+		send_kalman()
+
+		call yolo_run_part3
+		KalmanTracker_Predict()
+	}
+
+	// 检查检测结果
+	lc ptr0 TARGETS_ADDR
+	lc ptr1 TARGET_WITH_GUESTS
+	nop
+	lw detect_count ptr0
+	lcs i 0
+	// 记录所有头肩
+	lcs target_count 0
+	whileu i < detect_count {
+		l64_d d0 ptr0
+		lm_d s4 ptr0
+
+		// type = 0 头肩
+		ifu d0_lo == 0 {
+			sw ptr1 0 // 先设为0
+			sw ptr1 s4_0
+			sw ptr1 s4_1
+			sw ptr1 s4_2
+			sw ptr1 s4_3
+			inc target_count 1
+		}
+		inc i 1
+	}
+
+	// 遍历所有手势,将手势设置到TARGET_WITH_GUESTS
+	lc ptr0, TARGETS_ADDR + 4
+	lcs i 0
+	whileu i < detect_count {
+		l64_d d0 ptr0
+		lm_d s4 ptr0
+		
+		// 检查手势
+		ifu d0_lo != 0 {
+			lcs j 0
+			// 找到距离最近的头肩
+			lcs mindist 0x7fff
+			lcs best_match 0
+			lc ptr1 TARGET_WITH_GUESTS
+			whileu j < target_count {
+				lw_d tmp ptr1
+				lm_d s5 ptr1
+
+				// 检查s4,s5的距离
+				nop
+				sub dx s4_2 s5_2
+				sub dy s4_3 s5_3
+				muls32 dx dx dx
+				muls32 dy dy dy
+				add dist dx dy
+				sqrt dist dist
+				ifu dist < mindist {
+					mov mindist dist
+					sub best_match ptr1 20
+				}
+				
+				inc j 1
+			}
+
+			ifs best_match > 0 {
+				sw best_match d0_lo
+			}
+		}
+		inc i 1
+	}
+
+	lv target_status TARGET_TRACKED
+	ifu target_status == 0 {
+		lcs j 0
+		lc ptr1 TARGET_WITH_GUESTS
+		whileu j < target_count {
+			lw_d tmp ptr1
+			lm_d s4 ptr1
+
+			ifu tmp == GUEST_OK {
+				// OK,启动跟踪
+				send_s4()
+
+				simd_i32f32 s4 s4 31
+				KalmanTracker_Reset(s4_2, s4_3, s4_0, s4_1)
+				sv TARGET_TRACKED 1
+				break
+			} else {
+				// 停止跟踪或没有手势,不用管
+			}
+			inc j 1
+		}
+	} else {
+		// 读取跟踪结果.读出来是浮点要转成整数
+		lcs tmp KALMAN_BBOX
+		lm s4 tmp
+		simd_f32i32 s4 s4 31
+		// (x1,y1,x2,y2)转换成(w,h,cx,cy)
+		nop
+		add tmp s4_0 s4_2
+		srs s5_2 tmp 1
+		add tmp s4_1 s4_3
+		srs s5_3 tmp 1
+		sub s5_0 s4_2 s4_0
+		sub s5_1 s4_3 s4_1
+
+		// 找到距离最近的头肩
+		lcs j 0
+		lcs mindist 0x7fff
+		lcs best_match 0
+		lc ptr1 TARGET_WITH_GUESTS
+		whileu j < target_count {
+			lw_d tmp ptr1
+			lm_d s4 ptr1
+
+			nop
+			sub dx s4_2 s5_2
+			sub dy s4_3 s5_3
+			muls32 dx dx dx
+			muls32 dy dy dy
+			add dist dx dy
+			sqrt dist dist
+			ifu dist < mindist {
+				mov mindist dist
+				sub best_match ptr1 20
+			}
+			inc j 1
+		}
+
+		ifs best_match > 0 {
+			lw_d tmp best_match // 读取头肩的手势
+			lm_d s4 best_match, 4
+			
+			// 手势1和2表示停止
+			lcs stop_rj stop_flag
+			cjmpe stop_rj tmp GUEST_PALM
+			cjmpe stop_rj tmp GUEST_STOP
+
+			// 更新卡尔曼滤波
+			send_s4()
+			simd_i32f32 s4 s4 31
+			KalmanTracker_Update(s4_2, s4_3, s4_0, s4_1)
+			
+			// TODO: 跟丢了
+			jmp end_detect_track
+		stop_flag:
+			sv TARGET_TRACKED 0
+		} else {
+			// TODO: 跟丢了
+			sv TARGET_TRACKED 0
+			nop
+		}
+	}
+
+end_detect_track:
+	pop rp
+	ret

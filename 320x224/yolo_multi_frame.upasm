@@ -1,0 +1,89 @@
+
+#include layer0.upinc
+#include memory_layout.upinc
+#include yolo_layer.upinc
+
+
+@import init_psram
+@import layer0_input_psram_adr
+@import yolo_run_frame
+
+#define FRAME_SIZE (320*224*3)
+
+#define reg_spi_buf 0x0900050c
+/*
+[31:24]  spi_cmd       //SPI指令码,发送纯数据指令码为0
+[23]     spi_wr        //1:write, 0:read  
+[18:0]   spi_dat_num   //SPI每次读/写的字节数，最大为内存大小  
+*/
+#define reg_spi_cmd 0x09000510
+
+entry:
+
+	// spi_init
+	svw 0x09000500,0x12000
+	svw 0x09000504,0x103
+	call init_psram
+
+begin:
+		// 设置当前帧地址
+		lv r0 CURR_FRAME_ADR
+		svw layer0_input_psram_adr r0
+
+		// 保存下一帧地址
+		lc r1, FRAME_SIZE
+		inc r0 r1
+		sv CURR_FRAME_ADR r0
+
+		// 检查是否全都检查完成
+		lv r0 TESTED_FRAME_COUNT
+		ifu r0 >= TEST_FRAME_COUNT {
+			jmp end_
+		}
+		inc r0 1
+		sv TESTED_FRAME_COUNT r0
+
+		// 运行算法
+		call yolo_run_frame
+
+		//
+		// spi 发送结果
+		//
+
+		// 读取结果长度
+		lc r0 RECT_ADR_START
+		lw r1 r0
+		sub r0 r1 r0
+		// 写入spi_head
+		lc r1 spi_head
+		sw r1 r0 4
+
+		// 写数据头
+		svw reg_spi_buf spi_head
+		svw reg_spi_cmd 0x800008
+		wait_spi
+
+		// [31:24]  spi_cmd       //SPI指令码,发送纯数据指令码为0
+		// [23]     spi_wr        //1:write, 0:read  
+#var SPI_CMD 0
+#set_bits SPI_CMD 31 24 0
+#set_bits SPI_CMD 23 23 1
+		lc r1 SPI_CMD
+		or r0 r1 r0
+
+		// 写数据内容
+		svw reg_spi_buf RECT_ADR_START
+		svw reg_spi_cmd r0
+		wait_spi
+		jmp begin
+end_:
+	hlt
+
+CURR_FRAME_ADR:
+.word PSRAM_LAYER_0_INPUT
+
+TESTED_FRAME_COUNT:
+.word 0
+
+spi_head:
+.word 0x01ffffff, 0

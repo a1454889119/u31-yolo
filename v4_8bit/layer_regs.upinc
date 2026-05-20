@@ -1,0 +1,49 @@
+
+#define inadr r0
+#define outadr r1
+#define kadr r2
+#define badr r3
+
+#define layer_scale r4
+#define layer_zeropt r5
+#define layer_mulshift r7
+#define layer_padv r8
+
+#define outw r9
+#define outh r10
+#define outc r11
+#define outwxh r12
+
+#define instride r13
+#define outstride r14
+
+#define inadr2 r15
+#define leakyFlag r15
+#define nFlag r15
+#define saveFlag r16
+#define conv_step r16
+#define outadr2 r17
+#define sizeFlag r18
+
+#define outptr ptr0
+#define inptr ptr1
+
+#define sigv r18
+#define max_sigv r19
+#define min_sigv r20
+#define m22p10_1 r21
+#define m22p10_1024 r22
+#define exp_k r23
+
+#define INIT_SIGMOID \
+lcs exp_k 1477;\		
+lcs max_sigv 7168;\ 	
+lc min_sigv, -7168;\	
+lcs m22p10_1 1024;\
+lc m22p10_1024, 1024*1024;
+
+#define exp_m22p10(res,v) \
+muls32 v v exp_k;\
+sl v v 4;\
+exp2_m16p16 res v;\
+srs res res 6;	

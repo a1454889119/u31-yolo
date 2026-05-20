@@ -1,0 +1,253 @@
+@import TargetData
+//$func check_rect_nmls(out ignore_box)
+
+
+#define currtype s4_0
+#define currscore s4_1
+#define currx s5_0
+#define curry s5_1
+#define currw s5_2
+#define currh s5_3
+
+#define soft2 s4_0
+#define soft3 s4_1
+#define soft4 s4_2
+#define soft5 s4_3
+#define soft6 s5_0
+#define soft7 s5_1
+#define soft8 s5_2
+#define soft9 s5_3
+
+s0_data:
+.short 2 3 4 5 6 7 8 9
+
+#define exp_m22p10(res,v) \
+	muls32 v v exp_k;\
+	sl v v 4;\
+	exp2_m16p16 res v;\
+	srs res res 6;
+
+#define softmax_exp(t) \
+	exp_m22p10(t, t);\
+	inc sum t;
+
+$func yolo(in input_c40, in input_c2, in width, in height, in scale) {
+	reg count, w, h, s, i, j, const_1024, const_thres
+	reg c40ptr, c2ptr, scoreptr, c40_stride
+	reg score0, score1, 
+	reg soft0, soft1,
+	reg sum, sigv, max_sigv, min_sigv, m22p10_1024, exp_k,
+	reg float_1024, out0, out1, out2, out3, t0, t1
+	reg rj0, rj1, rj2, rj3, rjcurr
+	jmp yolo_start
+sigmoid:
+	neg sigv sigv // -x
+	ifs sigv >= max_sigv {
+		// -x大于7, 直接返回0
+		mov sigv 0
+		ret
+	}
+	ifs sigv <= min_sigv {
+		mov sigv const_1024
+		ret
+	}
+	exp_m22p10(sigv, sigv)
+	inc sigv const_1024
+	divs32 sigv m22p10_1024 sigv
+	ret
+
+softmax_10:
+	mov sum 0
+	softmax_exp(soft0)
+	softmax_exp(soft1)
+	softmax_exp(soft2)
+	softmax_exp(soft3)
+	softmax_exp(soft4)
+	softmax_exp(soft5)
+	softmax_exp(soft6)
+	softmax_exp(soft7)
+	softmax_exp(soft8)
+	softmax_exp(soft9)
+	i32tof32 sum sum 31;
+	fdiv sum float_1024 sum;
+	i32tof32 soft0 soft0 31;
+	i32tof32 soft1 soft1 31;
+	i32tof32 soft2 soft2 31;
+	i32tof32 soft3 soft3 31;
+	i32tof32 soft4 soft4 31;
+	i32tof32 soft5 soft5 31;
+	i32tof32 soft6 soft6 31;
+	i32tof32 soft7 soft7 31;
+	i32tof32 soft8 soft8 31;
+	i32tof32 soft9 soft9 31;
+	fmul soft0 sum soft0
+	fmul soft1 sum soft1
+	fmul soft2 sum soft2
+	fmul soft3 sum soft3
+	fmul soft4 sum soft4
+	fmul soft5 sum soft5
+	fmul soft6 sum soft6
+	fmul soft7 sum soft7
+	fmul soft8 sum soft8
+	fmul soft9 sum soft9
+	f32toi32 soft0 soft0 31;
+	f32toi32 soft1 soft1 31;
+	f32toi32 soft2 soft2 31;
+	f32toi32 soft3 soft3 31;
+	f32toi32 soft4 soft4 31;
+	f32toi32 soft5 soft5 31;
+	f32toi32 soft6 soft6 31;
+	f32toi32 soft7 soft7 31;
+	f32toi32 soft8 soft8 31;
+	f32toi32 soft9 soft9 31;
+	simd_32to16 s6_01 s4 0
+	simd_32to16 s6_23 s5 0
+	ret
+
+yolo_start:
+	lvw count TargetData
+	lc w s0_data
+	lm s0 w
+	lcs const_1024, 1024
+	lc const_thres, -1124
+	lcs exp_k 1477			// log2(e):  1.442695*(2^10)
+	lcs max_sigv 7168 	// 7.0 in m26p10, e^7=1096.6... > 1024
+	lc min_sigv, -7168	// -7.0 
+	lc m22p10_1024 1048576 	// 1024*1024
+	lc float_1024, 1024.0
+
+	load_reg c40ptr input_c40
+	load_reg c2ptr input_c2
+	load_reg w width
+	load_reg h height
+	load_reg s scale
+
+	// scoreptr = c40ptr + 38*2
+	lcs c40_stride, 40*2
+	lcs scoreptr, 38*2
+	inc scoreptr c40ptr
+
+
+	sl w w 10
+	sl h h 10
+	lcs i 512
+	lcs rjcurr check_curr
+	$jump_regs rj0 rj1 rj2 rj3 
+	whileu i < h {
+		lcs j 512
+		whileu j < w {
+			lsl score0 scoreptr
+			lsl score1 scoreptr, 2
+
+			cjmpsg rjcurr score0 const_thres
+			cjmpsg rjcurr score1 const_thres
+			jmp check_next
+check_curr:
+			mov ptr0 c40ptr			
+			lsl soft0 c2ptr
+			lm s6 ptr0
+			lsl soft1 c2ptr, 2			
+			simd_16to32 s4 s6_01
+			simd_16to32 s5 s6_23
+			call softmax_10
+			mov out0 soft1
+			simd_mac16_8 out0 s6 s0
+
+			lsl soft0 ptr0
+			lsl soft1 ptr0
+			lm s6 ptr0
+			nop
+			simd_16to32 s4 s6_01
+			simd_16to32 s5 s6_23
+			call softmax_10
+			mov out1 soft1
+			simd_mac16_8 out1 s6 s0
+
+
+			lsl soft0 ptr0
+			lsl soft1 ptr0
+			lm s6 ptr0
+			nop
+			simd_16to32 s4 s6_01
+			simd_16to32 s5 s6_23
+			call softmax_10
+			mov out2 soft1
+			simd_mac16_8 out2 s6 s0
+
+
+			lsl soft0 ptr0
+			lsl soft1 ptr0
+			lm s6 ptr0
+			nop
+			simd_16to32 s4 s6_01
+			simd_16to32 s5 s6_23
+			call softmax_10
+			mov out3 soft1
+			simd_mac16_8 out3 s6 s0
+
+			//out[0] = (j << 10) + 512 - out[0];  // w
+			//out[1] = (i << 10) + 512 - out[1];  // h
+			//out[2] = (j << 10) + 512 + out[2];
+			//out[3] = (i << 10) + 512 + out[3];
+			sub out0 j out0
+			sub out1 i out1
+			add out2 j out2
+			add out3 i out3
+
+			mov currtype 0
+			max sigv score0 score1
+			call sigmoid
+			mov currscore sigv
+			ifs score1 > score0 {				
+				mov currtype 1	
+			}
+			
+
+			//tar.w = (out[2] - out[0]) * scale;
+			sub currw out2 out0
+			muls32 currw currw s
+
+			//tar.h = (out[3] - out[1]) * scale;
+			sub currh out3 out1
+			muls32 currh currh s
+			
+			//tar.x = (out[0] + out[2]) / 2 * scale;
+			add currx out0 out2
+			srs currx currx 1
+			muls32 currx currx s
+
+			//tar.y = (out[1] + out[3]) / 2 * scale;
+			add curry out1 out3
+			srs curry curry 1
+			muls32 curry curry s
+
+			// check nmls
+			//check_rect_nmls(t0)
+			ifu t0 == 0 {
+				// t0: count
+				// t1: ptr
+				lvw t0, TargetData
+				lvw t1, TargetData + 4
+				sw t1 currtype 
+				sw t1 currscore 4
+				sw t1 currx 8
+				sw t1 curry 12
+				sw t1 currw 16
+				sw t1 currh 20
+				inc t1 24
+				svw , TargetData + 4, t1
+				
+				inc t0 1
+				svw TargetData, t0
+				cjmpuge rj0 t0 32
+			}
+check_next:
+			inc scoreptr c40_stride
+			inc c40ptr c40_stride
+			inc c2ptr 4
+			inc j const_1024
+		}
+		inc i const_1024
+	}
+	$jump_regs end
+}

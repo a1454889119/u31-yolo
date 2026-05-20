@@ -1,0 +1,42 @@
+
+#define bias_addr r0
+#define kernel_addr r1
+
+#define t0 r2
+#define t1 r3
+
+#define LAYER_16_PSRAM_ADDR 112000 // PSRAM_ADDR + LAYER_0_INPUT_SIZE
+
+@import layer_0_output
+@import layer_2_output
+@import layer_4_output
+@import layer_6_output
+@import layer_8_output
+@import layer_9_output
+@import layer_11_output
+@import layer_14_output
+@import layer_16_output
+@import layer_19_output
+@import layer_21_output
+@import layer_23_output
+@import layer_24_output
+@import layer_26_output
+@import layer_29_output
+@import layer_31_output
+@import layer_34_output
+@import layer_36_output
+@import layer_3_output
+@import layer_1_output
+@import layer_7_output
+@import layer_10_output
+@import layer_18_output
+@import layer_22_output
+@import layer_25_output
+@import layer_33_output
+@import layer_5_output
+@import layer_12_output
+@import layer_13_output
+@import layer_35_output
+@import layer_20_output
+@import layer_27_output
+@import layer_28_output

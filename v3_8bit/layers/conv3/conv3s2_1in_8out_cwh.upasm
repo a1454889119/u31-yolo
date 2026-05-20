@@ -1,0 +1,241 @@
+#include layer_param.upinc
+#include layer_regs.upinc
+
+#define k0_0 s0
+#define k0_1 s1
+#define k1_0 s2
+#define k1_1 s3
+#define k2_0 s4
+#define k2_1 s5
+#define k3_0 s10
+#define k3_1 s11
+#define kn_0 s12
+#define kn_1 s13
+#define kscale s14
+#define kzero_point s15
+#define b_03 s6
+#define b_47 s7
+#define b0 s6_0
+#define b1 s6_1
+#define b2 s6_2
+#define b3 s6_3
+#define b4 s7_0
+#define b5 s7_1
+#define b6 s7_2
+#define b7 s7_3
+/*
+#define kptr ptr0
+#define outptr ptr1
+
+$func conv3s2_1in_8out_cwh() {
+	reg inadr, outadr, wxh, kadr, badr, i, rj0
+	reg scale, zero_point, mulshift
+	reg param_ptr(rj0)
+	
+	lc param_ptr, LAYER_PARAM_ADDR
+	lw inadr param_ptr, INPUT_ADDR_OFF
+	lw outptr param_ptr, OUTPUT_ADDR_OFF
+	lw kptr param_ptr, KERNEL_ADDR_OFF
+	lw badr param_ptr, BIAS_ADDR_OFF
+	lw scale param_ptr, SCALE_OFF
+	lw zero_point param_ptr, ZERO_POINT_OFF
+	lw mulshift param_ptr, MUL_SHIFT_OFF
+	lw wxh param_ptr, OUTW_OFF
+	lw i param_ptr, OUTH_OFF
+	muls16 wxh wxh i
+	
+	lm_d k0_0 kptr
+	lm_d k0_1 kptr
+	lm_d k1_0 kptr
+	lm_d k1_1 kptr
+	lm_d k2_0 kptr
+	lm_d k2_1 kptr
+	lm_d k3_0 kptr
+	lm_d k3_1 kptr
+	mov kadr kptr
+	// 计算偏移量地址
+	simd_ext32 kscale scale
+	simd_ext32 kzero_point zero_point
+
+	svw 0x0900040c 0x00000000
+	svw 0x09000414 0x01331101
+	svw 0x09000418 0x00A00050
+	svw 0x0900041C 0x00000000
+	svw 0x09000420 0x0000C800
+	svw 0x09000424 0x50000140
+	svw 0x0900042C inadr
+	lcs d2_lo 0xc840
+
+	lcs i 0
+	$jump_regs rj0
+	whileu i < wxh {
+		mov kptr kadr
+		lm_d b_03 badr
+		lm_d b_47 badr, 16
+		wait_wnd // 等待窗口读取完成
+		simd_mac16_8 b0 k0_0 s8
+		simd_mac16_8 b1 k1_0 s8
+		simd_mac16_8 b2 k2_0 s8
+		simd_mac16_8 b3 k3_0 s8
+		simd_mac16_8 b0 k0_1 s9
+		simd_mac16_8 b1 k1_1 s9
+		simd_mac16_8 b2 k2_1 s9
+		simd_mac16_8 b3 k3_1 s9
+
+		lm_d kn_0 kptr
+		simd_mac16_8 b4 kn_0 s8
+		lm_d kn_1 kptr
+		simd_mac16_8 b4 kn_1 s9
+
+		lm_d kn_0 kptr
+		simd_mac16_8 b5 kn_0 s8
+		lm_d kn_1 kptr
+		simd_mac16_8 b5 kn_1 s9
+
+		lm_d kn_0 kptr
+		simd_mac16_8 b6 kn_0 s8
+		lm_d kn_1 kptr
+		simd_mac16_8 b6 kn_1 s9
+
+		lm_d kn_0 kptr
+		simd_mac16_8 b7 kn_0 s8
+		lm_d kn_1 kptr
+		simd_mac16_8 b7 kn_1 s9
+
+		img_data_rd	// 读取下一个窗口
+
+		simd_leaky d0 b_03 mulshift
+		simd_leaky d1 b_47 mulshift
+
+		simd_16to32 b_03 d0
+		simd_16to32 b_47 d1
+
+		simd_i32f32 b_03 b_03 31
+		simd_i32f32 b_47 b_47 31
+
+		simd_fmul b_03 b_03 kscale
+		simd_fmul b_47 b_47 kscale
+
+		simd_fsub b_03 b_03 kzero_point
+		simd_fsub b_47 b_47 kzero_point
+		// 浮点数round
+		simd_f32i32 kn_0 b_03 30
+		simd_f32i32 kn_1 b_03 31
+		simd_sub32 b_03 kn_0 kn_1
+		simd_f32i32 kn_0 b_47 30
+		simd_f32i32 kn_1 b_47 31
+		simd_sub32 b_47 kn_0 kn_1
+
+		simd_shuffle8 b_03 b_03 d2
+		simd_shuffle8 b_47 b_47 d2
+		sw outptr b0
+		sw outptr b4
+	
+		inc i 1
+	}
+	$jump_regs end
+}
+*/
+
+#define i r16
+#define rj0 r17
+
+#define kptr ptr2
+@export conv3s2_1in_8out_cwh
+conv3s2_1in_8out_cwh:
+
+	mov kptr kadr
+	simd_ext32 kscale layer_scale
+	simd_ext32 kzero_point layer_zeropt
+
+	lm_d k0_0 kptr
+	lm_d k0_1 kptr
+	lm_d k1_0 kptr
+	lm_d k1_1 kptr
+	lm_d k2_0 kptr
+	lm_d k2_1 kptr
+	lm_d k3_0 kptr
+	lm_d k3_1 kptr
+	mov kadr kptr
+	// 计算偏移量地址
+
+	svw 0x0900040c 0x00000000
+	svw 0x09000414 0x01331101
+	svw 0x09000418 0x00A00050
+	svw 0x0900041C 0x00000000
+	svw 0x09000420 0x0000C800
+	svw 0x09000424 0x50000140
+	svw 0x0900042C inadr
+	lcs d2_lo 0xc840
+
+	lcs i 0
+	$jump_regs rj0
+	whileu i < outwxh {
+		mov kptr kadr
+		lm_d b_03 badr
+		lm_d b_47 badr, 16
+		wait_wnd // 等待窗口读取完成
+		simd_mac16_8 b0 k0_0 s8
+		simd_mac16_8 b1 k1_0 s8
+		simd_mac16_8 b2 k2_0 s8
+		simd_mac16_8 b3 k3_0 s8
+		simd_mac16_8 b0 k0_1 s9
+		simd_mac16_8 b1 k1_1 s9
+		simd_mac16_8 b2 k2_1 s9
+		simd_mac16_8 b3 k3_1 s9
+
+		lm_d kn_0 kptr
+		simd_mac16_8 b4 kn_0 s8
+		lm_d kn_1 kptr
+		simd_mac16_8 b4 kn_1 s9
+
+		lm_d kn_0 kptr
+		simd_mac16_8 b5 kn_0 s8
+		lm_d kn_1 kptr
+		simd_mac16_8 b5 kn_1 s9
+
+		lm_d kn_0 kptr
+		simd_mac16_8 b6 kn_0 s8
+		lm_d kn_1 kptr
+		simd_mac16_8 b6 kn_1 s9
+
+		lm_d kn_0 kptr
+		simd_mac16_8 b7 kn_0 s8
+		lm_d kn_1 kptr
+		simd_mac16_8 b7 kn_1 s9
+
+		img_data_rd	// 读取下一个窗口
+
+		simd_leaky d0 b_03 layer_mulshift
+		simd_leaky d1 b_47 layer_mulshift
+
+		simd_16to32 b_03 d0
+		simd_16to32 b_47 d1
+
+		simd_i32f32 b_03 b_03 31
+		simd_i32f32 b_47 b_47 31
+
+		simd_fmul b_03 b_03 kscale
+		simd_fmul b_47 b_47 kscale
+
+		simd_fsub b_03 b_03 kzero_point
+		simd_fsub b_47 b_47 kzero_point
+		// 浮点数round
+		simd_f32i32 kn_0 b_03 30
+		simd_f32i32 kn_1 b_03 31
+		simd_sub32 b_03 kn_0 kn_1
+		simd_f32i32 kn_0 b_47 30
+		simd_f32i32 kn_1 b_47 31
+		simd_sub32 b_47 kn_0 kn_1
+
+		simd_shuffle8 b_03 b_03 d2
+		simd_shuffle8 b_47 b_47 d2
+		sw outptr b0
+		sw outptr b4
+
+		inc i 1
+	}
+	$jump_regs end
+
+
+	ret

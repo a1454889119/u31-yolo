@@ -1,0 +1,146 @@
+
+#define src_ptr ptr4
+#define dst0_ptr ptr0
+#define dst1_ptr ptr1
+#define dst2_ptr ptr2
+#define dst3_ptr ptr3
+
+$func write_zeros(in addr) {
+	nop
+	load_reg ptr0 addr
+	simd_ext32 s0 0
+	repeat_sta 8
+write_80_0:	
+		sm dst0_ptr s0
+		sm dst0_ptr s0
+		sm dst0_ptr s0
+		sm dst0_ptr s0
+		sm dst0_ptr s0
+	repeat_end write_80_0
+}
+
+
+$func transpos_120x160_padzeros(in input, in output) {
+	reg h, i, j, dst_adr
+
+	lcs h 160
+	load_reg src_ptr input
+	load_reg dst_adr output
+
+	write_zeros(dst_adr)
+	lcs i, 160*4
+	inc dst_adr i
+
+	sl i 1 16
+	lcs j, 160*4
+	or i i j
+
+	svw 0x09000058 i
+	svw 0x0900005c i
+	svw 0x09000060 i
+	svw 0x09000064 i
+	
+	lcs i, 0
+	whileu i < h {
+		add dst0_ptr dst_adr i
+		add dst1_ptr dst0_ptr h
+		add dst2_ptr dst1_ptr h
+		add dst3_ptr dst2_ptr h
+	
+		// 3*32 + 16 + 8 = 120
+		repeat_sta 3
+pixels_32:
+			lm_d s6 src_ptr
+			lm_d s7 src_ptr
+			simd_8to32 s4 s6_0
+			simd_8to32 s5 s6_1
+			sbyte dst0_ptr s4_0
+			sbyte dst1_ptr s4_1
+			sbyte dst2_ptr s4_2
+			sbyte dst3_ptr s4_3
+			sbyte dst0_ptr s5_0
+			sbyte dst1_ptr s5_1
+			sbyte dst2_ptr s5_2
+			sbyte dst3_ptr s5_3
+
+			simd_8to32 s4 s6_2
+			simd_8to32 s5 s6_3
+			sbyte dst0_ptr s4_0
+			sbyte dst1_ptr s4_1
+			sbyte dst2_ptr s4_2
+			sbyte dst3_ptr s4_3
+			sbyte dst0_ptr s5_0
+			sbyte dst1_ptr s5_1
+			sbyte dst2_ptr s5_2
+			sbyte dst3_ptr s5_3
+
+			simd_8to32 s4 s7_0
+			simd_8to32 s5 s7_1
+			sbyte dst0_ptr s4_0
+			sbyte dst1_ptr s4_1
+			sbyte dst2_ptr s4_2
+			sbyte dst3_ptr s4_3
+			sbyte dst0_ptr s5_0
+			sbyte dst1_ptr s5_1
+			sbyte dst2_ptr s5_2
+			sbyte dst3_ptr s5_3
+
+			simd_8to32 s4 s7_2
+			simd_8to32 s5 s7_3
+			sbyte dst0_ptr s4_0
+			sbyte dst1_ptr s4_1
+			sbyte dst2_ptr s4_2
+			sbyte dst3_ptr s4_3
+			sbyte dst0_ptr s5_0
+			sbyte dst1_ptr s5_1
+			sbyte dst2_ptr s5_2
+			sbyte dst3_ptr s5_3
+		repeat_end pixels_32
+
+		lm_d s6 src_ptr
+		l64_d s7_01 src_ptr
+		simd_8to32 s4 s6_0
+		simd_8to32 s5 s6_1
+		sbyte dst0_ptr s4_0
+		sbyte dst1_ptr s4_1
+		sbyte dst2_ptr s4_2
+		sbyte dst3_ptr s4_3
+		sbyte dst0_ptr s5_0
+		sbyte dst1_ptr s5_1
+		sbyte dst2_ptr s5_2
+		sbyte dst3_ptr s5_3
+
+		simd_8to32 s4 s6_2
+		simd_8to32 s5 s6_3
+		sbyte dst0_ptr s4_0
+		sbyte dst1_ptr s4_1
+		sbyte dst2_ptr s4_2
+		sbyte dst3_ptr s4_3
+		sbyte dst0_ptr s5_0
+		sbyte dst1_ptr s5_1
+		sbyte dst2_ptr s5_2
+		sbyte dst3_ptr s5_3
+
+		simd_8to32 s4 s7_0
+		simd_8to32 s5 s7_1
+		sbyte dst0_ptr s4_0
+		sbyte dst1_ptr s4_1
+		sbyte dst2_ptr s4_2
+		sbyte dst3_ptr s4_3
+		sbyte dst0_ptr s5_0
+		sbyte dst1_ptr s5_1
+		sbyte dst2_ptr s5_2
+		sbyte dst3_ptr s5_3
+
+		inc i 1
+	}
+
+	svw 0x09000058 0
+	svw 0x0900005c 0
+	svw 0x09000060 0
+	svw 0x09000064 0
+	
+	lcs i, 160*120
+	inc dst_adr i
+	write_zeros(dst_adr)
+}

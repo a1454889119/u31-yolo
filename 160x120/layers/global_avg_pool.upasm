@@ -1,0 +1,84 @@
+
+#define outptr ptr0
+#define inptr ptr1
+
+
+#define load_and_calc \
+lm_d s1 inptr;\
+simd_mac16_8 sum s0 s1;
+
+$func global_avg_pool_20x16(in input, in output, in channels) {
+	reg i, j, c, sum, wxh
+	reg rj0
+	lcs wxh, 20*16
+	load_reg inptr, input
+	load_reg outptr, output
+	load_reg c channels
+
+	simd_ext16 s0 1 0 // 设置16个1
+	simd_ext16 s6 1 0 // 设置16个1
+	lcs i 0
+	$jump_regs rj0
+	whileu i < c {
+
+		lcs sum 0
+		// 20*16/8=40次, 需要执行37次8个一组的, 1次4个一组的
+		repeat_sta 5
+process_8:
+			load_and_calc
+			load_and_calc
+			load_and_calc
+			load_and_calc
+			load_and_calc
+			load_and_calc
+			load_and_calc
+			load_and_calc
+			
+		repeat_end process_8
+		inc i 1
+
+		// 计算平均值
+		divs32 sum sum wxh
+		ssl outptr sum
+	}
+	$jump_regs end
+
+}
+
+$func global_avg_pool_40x32(in input, in output, in channels) {
+	reg i, j, c, sum, wxh
+	reg rj0
+	lcs wxh, 40*32
+	load_reg inptr, input
+	load_reg outptr, output
+	load_reg c channels
+
+	simd_ext16 s0 1 0 // 设置16个1
+	lcs i 0
+	$jump_regs rj0
+	whileu i < c {
+
+		lcs sum 0
+		// 40*32/8=160次
+		repeat_sta 16
+process_10:
+			load_and_calc
+			load_and_calc
+			load_and_calc
+			load_and_calc
+			load_and_calc
+			load_and_calc
+			load_and_calc
+			load_and_calc
+			load_and_calc
+			load_and_calc
+		repeat_end process_10
+
+		// 计算平均值
+		divs32 sum sum wxh
+		ssl outptr sum
+		inc i 1
+	}
+	$jump_regs end
+
+}

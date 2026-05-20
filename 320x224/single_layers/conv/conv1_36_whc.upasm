@@ -1,0 +1,235 @@
+#include conv1.upinc
+
+#define output_ptr ptr0
+#define kernel_ptr ptr1
+#define bias_ptr ptr2
+
+#define input_ptr r11
+#define out_ptr r12
+#define i64 r13
+
+#define br0   s4
+#define br0_0 s4_0
+#define br0_1 s4_1
+#define br0_2 s4_2
+#define br0_3 s4_3
+
+#define br1   s5
+#define br1_0 s5_0
+#define br1_1 s5_1
+#define br1_2 s5_2
+#define br1_3 s5_3
+
+#define br2   s6
+#define br2_0 s6_0
+#define br2_1 s6_1
+#define br2_2 s6_2
+#define br2_3 s6_3
+
+
+#define in_0 s0
+#define in_1 s1
+#define in_2 s2
+#define in_3 s3
+#define in_4 d7
+
+#define k0_0 s13
+#define k0_1 s14
+#define k0_2 s7
+#define k0_3 s8
+#define k0_4 d6
+
+#define kn_0 s9
+#define kn_1 s10
+#define kn_2 s11
+#define kn_3 s12
+#define kn_4 d5
+
+// 需要考虑输入stride, 不需要考虑输出stride
+@export conv1_36_whc
+conv1_36_whc:
+
+	lcs i64 64
+	mov kernel_ptr conv1_kernel_adr
+	mov input_ptr conv1_in_adr
+	mov out_ptr conv1_out_adr
+	
+	lm_d  k0_0 kernel_ptr
+	lm_d  k0_1 kernel_ptr
+	lm_d  k0_2 kernel_ptr
+	lm_d  k0_3 kernel_ptr
+	l64_d k0_4 kernel_ptr
+
+	
+	muls16 conv1_input_end conv1_w conv1_h
+	muls32 conv1_input_end conv1_input_end conv1_in_stride
+	inc conv1_input_end input_ptr
+
+	muls16 conv1_out_stride conv1_w conv1_h
+	sl conv1_out_stride conv1_out_stride 1
+	bit_set conv1_out_stride conv1_out_stride 16
+	sv PTR0_OFFSET_ADR conv1_out_stride
+
+
+//	lcs r23 0
+//	lcs r24 243
+
+	mov conv1_kernel_adr kernel_ptr
+	$jump_regs r20 r21
+	whileu input_ptr < conv1_input_end {
+		mov output_ptr out_ptr
+		mov bias_ptr conv1_bias_adr
+		mov kernel_ptr conv1_kernel_adr
+
+//		ifu r23 == r24 {
+//			nop
+//		}
+//		inc r23 1
+
+		lm_d br0 bias_ptr
+		lm_d br1 bias_ptr
+		lm_d br2 bias_ptr
+
+		lm_d in_0 input_ptr 0
+		simd_mac16_8 	br0_0 k0_0  in_0
+		lm_d in_1 input_ptr 16
+		simd_mac16_8 	br0_0 k0_1  in_1
+		lm_d in_2 input_ptr 32
+		simd_mac16_8 	br0_0 k0_2  in_2
+		lm_d in_3 input_ptr 48
+		simd_mac16_8 	br0_0 k0_3  in_3
+		l64_d in_4 input_ptr i64
+		simd_mac16_4 br0_0 k0_4  in_4
+
+#define load_calc(res) \
+simd_mac16_8 	res kn_0  in_0;\
+lm_d kn_1 kernel_ptr;\
+simd_mac16_8 	res kn_1  in_1;\
+lm_d kn_2 kernel_ptr;\
+simd_mac16_8 	res kn_2  in_2;\
+lm_d kn_3 kernel_ptr;\
+simd_mac16_8 	res kn_3  in_3;\
+l64_d kn_4 kernel_ptr;\
+simd_mac16_4 res kn_4  in_4;
+
+#define load_calc_full(res) \
+lm_d kn_0 kernel_ptr;\
+load_calc(res)
+
+		load_calc_full(br0_1)
+		load_calc_full(br0_2)
+		load_calc_full(br0_3)
+
+		load_calc_full(br1_0)
+		load_calc_full(br1_1)
+		load_calc_full(br1_2)
+		load_calc_full(br1_3)
+
+		load_calc_full(br2_0)
+		load_calc_full(br2_1)
+		load_calc_full(br2_2)
+		load_calc_full(br2_3)
+
+		simd_linear d0 br0 10
+		simd_linear d1 br1 10
+		simd_linear d2 br2 10
+
+		lm_d br0 bias_ptr
+		lm_d br1 bias_ptr
+		lm_d br2 bias_ptr
+		lm_d kn_0 kernel_ptr
+
+		ssl output_ptr d0_lo
+		ss  output_ptr d0_lo
+		ssl output_ptr d0_hi
+		ss  output_ptr d0_hi
+
+		ssl output_ptr d1_lo
+		ss  output_ptr d1_lo
+		ssl output_ptr d1_hi
+		ss  output_ptr d1_hi
+
+		ssl output_ptr d2_lo
+		ss  output_ptr d2_lo
+		ssl output_ptr d2_hi
+		ss  output_ptr d2_hi
+
+		load_calc(br0_0)
+		load_calc_full(br0_1)
+		load_calc_full(br0_2)
+		load_calc_full(br0_3)
+
+		load_calc_full(br1_0)
+		load_calc_full(br1_1)
+		load_calc_full(br1_2)
+		load_calc_full(br1_3)
+
+		load_calc_full(br2_0)
+		load_calc_full(br2_1)
+		load_calc_full(br2_2)
+		load_calc_full(br2_3)
+
+		simd_linear d0 br0 10
+		simd_linear d1 br1 10
+		simd_linear d2 br2 10
+
+		lm_d br0 bias_ptr
+		lm_d br1 bias_ptr
+		lm_d br2 bias_ptr
+		lm_d kn_0 kernel_ptr
+
+		ssl output_ptr d0_lo
+		ss  output_ptr d0_lo
+		ssl output_ptr d0_hi
+		ss  output_ptr d0_hi
+
+		ssl output_ptr d1_lo
+		ss  output_ptr d1_lo
+		ssl output_ptr d1_hi
+		ss  output_ptr d1_hi
+
+		ssl output_ptr d2_lo
+		ss  output_ptr d2_lo
+		ssl output_ptr d2_hi
+		ss  output_ptr d2_hi
+
+		load_calc(br0_0)
+		load_calc_full(br0_1)
+		load_calc_full(br0_2)
+		load_calc_full(br0_3)
+
+		load_calc_full(br1_0)
+		load_calc_full(br1_1)
+		load_calc_full(br1_2)
+		load_calc_full(br1_3)
+
+		load_calc_full(br2_0)
+		load_calc_full(br2_1)
+		load_calc_full(br2_2)
+		load_calc_full(br2_3)
+
+		simd_linear d0 br0 10
+		simd_linear d1 br1 10
+		simd_linear d2 br2 10
+
+		ssl output_ptr d0_lo
+		ss  output_ptr d0_lo
+		ssl output_ptr d0_hi
+		ss  output_ptr d0_hi
+
+		ssl output_ptr d1_lo
+		ss  output_ptr d1_lo
+		ssl output_ptr d1_hi
+		ss  output_ptr d1_hi
+
+		ssl output_ptr d2_lo
+		ss  output_ptr d2_lo
+		ssl output_ptr d2_hi
+		ss  output_ptr d2_hi
+		inc input_ptr conv1_in_stride
+		inc out_ptr 2
+	}
+	$jump_regs end
+	sv PTR0_OFFSET_ADR 0
+
+	ret

@@ -1,0 +1,242 @@
+#include layer0.upinc
+
+#define VDMA1_ADDR_0 0x09000414
+#define VDMA1_ADDR_1 0x09000418
+#define VDMA1_ADDR_2 0x0900041c
+#define VDMA1_ADDR_3 0x09000420
+#define VDMA1_ADDR_4 0x09000424
+#define VDMA1_ADDR_5 0x0900042c
+
+#var VDMA1_PARAM_0 0
+#set_bits VDMA1_PARAM_0 29 29 1					// [29]     VDMA1数据选择  1:从PSRAM读取数据 
+#set_bits VDMA1_PARAM_0 28 28 0					// [28]     VDMA1数据1bit时的扩展数据值
+#set_bits VDMA1_PARAM_0 26 24 1					// [26:24]  VDMA1数据格式 0:1bit, 1:8bit, 2:16bit, 3:32bit, 4:128bit
+#set_bits VDMA1_PARAM_0 23 20 9					// [23:20]  VDMA1卷积核宽 	
+#set_bits VDMA1_PARAM_0 19 16 3					// [19:16]  VDMA1卷积核高 
+#set_bits VDMA1_PARAM_0 14 12 3					// [14:12]  VDMA1宽方向扩展像素(左、右分别扩展,9*3的窗口需设为3
+#set_bits VDMA1_PARAM_0 10  8 1					// [10:8]   VDMA1高度扩宽图像行(上、下均扩展	
+#set_bits VDMA1_PARAM_0  1  0 1					// [1:0]    VDMA1阁行\点取数据,0:连续取, 1:隔2行/点, 2:隔4行/点	
+
+#var VDMA1_PARAM_1 0 
+#set_bits VDMA1_PARAM_1 28 16 160				// [28:16]  VDMA1读取图像时为降采样后的图像宽(列/矩阵乘法时为输出矩阵宽,VDMA1读取1行图像时需配置为读取一行图像的字节数  
+#set_bits VDMA1_PARAM_1 11  0 112				// [11:0]   VDMA1读取图像时为降采样后的图像高(行/矩阵乘法时为输出矩阵高
+
+#var VDMA1_PARAM_2 0
+#set_bits VDMA1_PARAM_2 14 12 0					// [14:12]  VDMA1从PSRAM读取图象时降采样倍数: 1:2倍, 3:4倍, 7:8倍 
+#set_bits VDMA1_PARAM_2 10  0 1024				// [10:0]   VDMA1从PSRAM读取时PSRAM请求阈值,缓存可写数据大于阈值后请求PSRAM读
+
+#var VDMA1_PARAM_3 0 
+#set_bits VDMA1_PARAM_3 17  0 215040			// [17:0]   VDMA1读取数据字节数
+
+#var VDMA1_PARAM_4 0
+#set_bits VDMA1_PARAM_4 31 28 5					// [30:28]  VDMA1指令码
+#set_bits VDMA1_PARAM_4 27 27 0					// [27]     VDMA1二值化模式,1:>, 0:<
+#set_bits VDMA1_PARAM_4 26 26 0					// [26]     VDMA1数据映射128寄存器的模式,1：按列映射(只对9*3的图像窗口有效,0：按行映射
+#set_bits VDMA1_PARAM_4 25 25 0					// [25]     VDMA1图像滤波模式 1:双通道卷积, 0:单通道卷积
+#set_bits VDMA1_PARAM_4 24 24 0					// [24]     VDMA1中断模式 1: 按行中断, 0:读取完成后中断,按行中断每输出一行产生一个中断并停止执行,需要写任意值到0x09000430计算下一行,所有的行输出完成后写0x0900042c的指令将被忽略 
+#set_bits VDMA1_PARAM_4 23 16 0					// [23:16]  VDMA1二值化阈值 
+#set_bits VDMA1_PARAM_4 14  0 960				// [14:0]   VDMA1读取图像时为原图一行的字节数(宽*像素字节数, 读矩阵时为第一个矩阵一行的字节数(宽*单个数据字节数
+
+#define kernel_ptr ptr0
+
+#define out_ptr r3
+#define off1 r4
+#define off2 r5
+#define off3 r6
+#define off4 r7
+#define off5 r8
+#define off6 r9
+#define off7 r10
+#define out_end r11
+#define out_start r12
+#define kstart_ptr r13
+#define bias_ptr r14
+#define psram_start r15
+#define psram_ptr r16
+#define channel_size r17
+#define i r18
+#define tmp_data_size r19
+
+#define in_0 s8
+#define in_1 s9
+#define in_2 s10
+#define in_3_128 s11
+#define in_3_copy s7
+#define in_3 s7_01
+
+#define k0_0 s0
+#define k0_1 s1
+#define k0_2 s2
+#define k0_3 d5
+
+#define k1_0 s3
+#define k1_1 s4
+#define k1_2 s12
+#define k1_3 d6
+
+#define kn_0 s13
+#define kn_1 s14
+#define kn_2 s15
+#define kn_3 d7
+
+#define br0 s5
+#define br0_0 s5_0
+#define br0_1 s5_1
+#define br0_2 s5_2
+#define br0_3 s5_3
+
+#define br1 s6
+#define br1_0 s6_0
+#define br1_1 s6_1
+#define br1_2 s6_2
+#define br1_3 s6_3
+
+@export layer0_input_psram_adr
+layer0_input_psram_adr:
+.word 0
+
+@export layer0_prepare
+layer0_prepare:
+// 初始化窗口读取
+	bit_set r91, r91, 31
+
+	svw VDMA1_ADDR_0 VDMA1_PARAM_0
+	svw VDMA1_ADDR_1 VDMA1_PARAM_1
+	svw VDMA1_ADDR_2 VDMA1_PARAM_2
+	svw VDMA1_ADDR_3 VDMA1_PARAM_3
+	svw VDMA1_ADDR_4 VDMA1_PARAM_4
+//	lvw r0 ADDR_OF_SRC_IMAGE_ADDR
+//	sv  VDMA1_ADDR_4 r0
+	lvw off1 layer0_input_psram_adr
+	sv VDMA1_ADDR_5 off1
+ 
+	mov out_start layer0_tmp_adr
+	lcs off1, 160*28*2		// 160*28*2
+	muls16 off2 off1 2
+	muls16 off3 off1 3
+	muls16 off4 off1 4
+	muls16 off5 off1 5
+	muls16 off6 off1 6
+	muls16 off7 off1 7
+
+	lcs channel_size, 160*112*2
+
+	mov kernel_ptr layer0_kernel_adr
+	mov bias_ptr layer0_bias_adr
+	lcs kstart_ptr 112
+	inc kstart_ptr layer0_kernel_adr
+
+	lcs psram_start PSRAM_LAYER_0_OUTPUT
+
+	lcs tmp_data_size, 160*112*4
+	ret
+
+
+@export layer0
+layer0:
+	// svw 0x09000600 0x300886c0
+	lm_d  k0_0 kernel_ptr
+	lm_d  k0_1 kernel_ptr
+	lm_d  k0_2 kernel_ptr
+	l64_d k0_3 kernel_ptr
+	lm_d  k1_0 kernel_ptr
+	lm_d  k1_1 kernel_ptr
+	lm_d  k1_2 kernel_ptr
+	l64_d k1_3 kernel_ptr
+	
+	lcs i 0
+	$jump_regs r30 ...
+	whileu i < 4 {
+		mov psram_ptr psram_start
+		mov out_ptr out_start
+		add out_end out_ptr off1
+		whileu out_ptr < out_end {
+			lm_d br0 bias_ptr
+			lm_d br1 bias_ptr 16
+			mov kernel_ptr kstart_ptr
+			wait_wnd // 等待窗口数据
+			
+			simd_copy in_3_copy in_3_128
+
+			// 输出通道0 + 1
+			simd_mac16_8 	br0_0 in_0 k0_0
+			simd_mac16_8 	br0_1 in_0 k1_0
+			simd_mac16_8 	br0_0 in_1 k0_1
+			simd_mac16_8 	br0_1 in_1 k1_1
+			simd_mac16_8 	br0_0 in_2 k0_2
+			simd_mac16_8 	br0_1 in_2 k1_2
+			simd_mac16_4 	br0_0 in_3 k0_3
+			simd_mac16_4 	br0_1 in_3 k1_3
+	
+#define calc(res)	\
+lm_d  kn_0 kernel_ptr;\
+simd_mac16_8 	res in_0 kn_0;\
+lm_d  kn_1 kernel_ptr;\
+simd_mac16_8 	res in_1 kn_1;\
+lm_d  kn_2 kernel_ptr;\
+simd_mac16_8 	res in_2 kn_2;\
+l64_d kn_3 kernel_ptr;\
+simd_mac16_4 res in_3 kn_3;
+
+			calc(br0_2) // 输出通道2
+			calc(br0_3) // 输出通道3
+			calc(br1_0) // 输出通道4
+			calc(br1_1) // 输出通道5
+			calc(br1_2) // 输出通道6
+			calc(br1_3) // 输出通道7
+
+			img_data_rd // 移动窗口
+
+			simd_relu d0 br0 8
+			simd_relu d1 br1 8
+
+			ssl out_ptr d0_lo 0
+			ss  out_ptr d0_lo off1
+			ssl out_ptr d0_hi off2
+			ss  out_ptr d0_hi off3
+			ssl out_ptr d1_lo off4
+			ss  out_ptr d1_lo off5
+			ssl out_ptr d1_hi off6
+			ss  out_ptr d1_hi off7
+			inc out_ptr 2
+		}
+	
+		ifu i > 0 {
+			// 等待PSRAM写完成
+			wait_psram
+		}
+
+#var PSRAM_WRITE_CODE 0
+#set_bits PSRAM_WRITE_CODE 31 24 0x80
+#set_bits PSRAM_WRITE_CODE 23 23 1
+#set_bits PSRAM_WRITE_CODE 15  0 8960
+		// 向PSRAM写数据
+		mov out_ptr out_start
+		add out_end out_start off7
+		inc out_end off1
+	
+		whileu out_ptr < out_end {
+			sv  0x09000608 psram_ptr
+			sv  0x0900060c out_ptr
+			svw 0x09000610 PSRAM_WRITE_CODE
+			inc psram_ptr channel_size
+			inc out_ptr off1
+		}
+		sv 0x09000620 1
+
+		inc psram_start off1
+		// i等于0和2时(i的第0个bit是0), 把out_start指向tmp_data_1
+		mov out_start layer0_tmp_adr
+		ifu i neb 0 {
+			inc out_start tmp_data_size
+		}
+
+		inc i 1
+	}
+	$jump_regs end
+
+	//// 这里不等待PSRAM写完成了
+	//wait_psram
+	ret
+
+	

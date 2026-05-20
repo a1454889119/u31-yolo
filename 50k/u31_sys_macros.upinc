@@ -1,0 +1,55 @@
+// ---------------------------------------------------
+// FPU arguments Parser Tool, Upixels Co.Ltd.
+//
+// Generated file - DO NOT EDIT!
+// Created from d:\git\u31-yolo\fpu.upconf
+// Data 2024-1-23 16:31:14
+// ---------------------------------------------------
+
+#define SP_ADR               0x0003fffc
+#define FIFO0_ADR            0x3dfc3dfb
+#define FIFO1_ADR            0x3dfc3dfb
+#define FIFO2_ADR            0x3dfc3dfb
+#define FIFO3_ADR            0x3dfc3dfb
+#define FIFO4_ADR            0x3dfc3dfb
+#define FIFO5_ADR            0x3dfc3dfb
+#define FIFO6_ADR            0x3dfc3dfb
+#define FIFO7_ADR            0x3dfc3dfb
+#define FIFO8_ADR            0x3dfc3dfb
+#define FIFO9_ADR            0x3dfc3dfb
+#define FIFO10_ADR           0x3dfc3dfb
+#define FIFO11_ADR           0x3dfc3dfb
+#define FIFO12_ADR           0x3dfc3dfb
+#define FIFO13_ADR           0x3dfc3dfb
+#define FIFO14_ADR           0x3dfc3dfb
+#define FIFO15_ADR           0x3dfc3dfb
+#define FIFO_LENGTH_1_0      0x00000000
+#define FIFO_LENGTH_3_2      0x00000000
+#define FIFO_LENGTH_5_4      0x00000000
+#define FIFO_LENGTH_7_6      0x00000000
+#define FIFO_LENGTH_9_8      0x00000000
+#define FIFO_LENGTH_b_a      0x00000000
+#define FIFO_LENGTH_d_c      0x00000000
+#define FIFO_LENGTH_f_e      0x00000000
+#define FFT_OUT0_ADR         0x0003dfc0
+#define FFT_OUT1_ADR         0x0003dfc0
+#define FFT_OUT2_ADR         0x0003dfc0
+#define FFT_OUT3_ADR         0x0003dfc0
+#define FFT_OUT4_ADR         0x0003dfc0
+#define FFT_OUT5_ADR         0x0003dfc0
+#define FFT_OUT6_ADR         0x0003dfc0
+#define FFT_OUT7_ADR         0x0003dfc0
+#define FFT_BUF_ADR          0x0003dfc0
+#define IFFT_EXP			  0x01000000
+#define IMG1_ADR1            0x00000000
+#define IMG1_ADR2            0x00000000
+#define IMG2_ADR1            0x00000000
+#define IMG2_ADR2            0x00000000
+#define IMG1_FIFO_ADR        0x00000000
+#define IMG2_FIFO_ADR        0x00000000
+#define IMG_FIFO_LENGTH      0x00000800
+#define VDMA1_FIFO_ADR       0x3dfc3ffb
+#define IMG_OUT_FIFO_ADR     0x00000000
+#define VDMA_FIFO_LENGTH     0x00000200
+#define MAX_LINK_ADDR        0x0003dfc0
+

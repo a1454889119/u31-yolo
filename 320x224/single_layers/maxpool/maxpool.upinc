@@ -1,0 +1,2 @@
+#define maxp_out_adr r0
+#define maxp_in_adr r1

@@ -1,0 +1,22 @@
+@import yolo_run_part1
+@import yolo_run_part2
+@import yolo_run_part3
+@import KALMAN_BBOX
+$func KalmanTracker_Reset(in _cx, in _cy, in width, in height)
+$func KalmanTracker_Predict()
+$func KalmanTracker_Update(in _cx, in _cy, in width, in height)
+
+entry:
+
+	svw 0x09000040 3
+
+	call yolo_run_part1
+	call yolo_run_part2
+	call yolo_run_part3
+
+	//KalmanTracker_Reset(15.0, 15.0, 30.0, 30.0)
+	//KalmanTracker_Predict()
+	//KalmanTracker_Update(16.0, 16.0, 30.0, 30.0)
+
+	lvw r0 0x09000040
+	hlt

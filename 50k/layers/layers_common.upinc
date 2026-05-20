@@ -1,0 +1,7 @@
+#include "layer_params.upinc"
+#include "param_addr.upinc"
+#include "yolo.upinc"
+#include "yolo_size.upinc"
+
+@import layer_rp_adr0
+@import layer_rp_adr1

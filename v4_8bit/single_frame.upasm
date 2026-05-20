@@ -1,0 +1,22 @@
+
+//$func yolo_run()
+@import yolo_run
+@import write_uart_pool
+
+entry:
+	svw 0x09000038, 0x00ff8800
+	// 36.66M
+//	svw 0x09000000, 0x13021454 //pll1=242Mhz, pll2=20Mhz
+//	svw 0x09000008, 0x200063   //music_clk=PLL2; sencor_clk=PLL2
+
+	// 48.17M
+//	svw 0x09000000, 0x130244b4 //pll1=242Mhz, pll2=20Mhz
+//	svw 0x09000008, 0x200063   //music_clk=PLL2; sencor_clk=PLL2
+
+	svw 0x09000040 3
+	call yolo_run
+	lvw r0 0x09000040
+	call write_uart_pool
+
+
+	hlt

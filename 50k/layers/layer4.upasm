@@ -1,0 +1,71 @@
+//---------------LAYER 4(conv-------------
+//input:88x44x18
+//output:44x22x18
+//k3s2p1group=18
+//leaky
+// 88x44x18=>44x22x18 3x3分组卷积 leaky 输入whc 输出cwh
+#include "layers_common.upinc"
+
+
+@import conv_params
+@import conv_grouped_k3snp1
+
+#var VDMA1_PARAM_0 0
+#set_bits VDMA1_PARAM_0 30 30 0			// [30]     VDMA1图像格式  0:ONLY Y
+#set_bits VDMA1_PARAM_0 29 29 0			// [29]     VDMA1数据选择  1:从PSRAM读取数据 
+#set_bits VDMA1_PARAM_0 28 28 0			// [28]     VDMA1数据1bit时的扩展数据值
+#set_bits VDMA1_PARAM_0 26 24 LAYER_4_INPUT_FMT	// [26:24]  VDMA1数据格式 0:1bit 1:8bit 2:16bit 3:32bit 4:128bit
+#set_bits VDMA1_PARAM_0 23 20 LAYER_4_KERNEL_W	// [23:20]  VDMA1卷积核宽 	
+#set_bits VDMA1_PARAM_0 19 16 LAYER_4_KERNEL_H	// [19:16]  VDMA1卷积核高 
+#set_bits VDMA1_PARAM_0 14 12 LAYER_4_PADDING_X	// [14:12]  VDMA1宽方向扩展像素(左、右分别扩展9*3的窗口需设为3
+#set_bits VDMA1_PARAM_0 10  8 LAYER_4_PADDING_Y	// [10:8]   VDMA1高度扩宽图像行(上、下均扩展	
+#set_bits VDMA1_PARAM_0  1  0 LAYER_4_INTERVAL	// [1:0]    VDMA1阁行\点取数据0:连续取 1:隔2行/点 2:隔4行/点	
+
+#var VDMA1_PARAM_1 0 
+#set_bits VDMA1_PARAM_1 24 12 LAYER_4_OUTPUT_W	// [24:12]  VDMA1读取图像时为降采样后的图像宽(列/矩阵乘法时为输出矩阵宽VDMA1读取1行图像时需配置为读取一行图像的字节数  
+#set_bits VDMA1_PARAM_1 11  0 LAYER_4_OUTPUT_H	// [11:0]   VDMA1读取图像时为降采样后的图像高(行/矩阵乘法时为输出矩阵高
+
+
+#var VDMA1_PARAM_3 0
+#set_bits VDMA1_PARAM_3 30 28 LAYER_4_VDMA1_CODE	// [30:28]  VDMA1指令码
+#set_bits VDMA1_PARAM_3 27 27 0	// [27]     VDMA1二值化模式1:> 0:<
+#set_bits VDMA1_PARAM_3 26 26 0	// [26]     VDMA1数据映射128寄存器的模式1：按列映射(只对9*3的图像窗口有效0：按行映射
+#set_bits VDMA1_PARAM_3 25 25 0	// [25]     VDMA1图像滤波模式 1:双通道卷积 0:单通道卷积
+#set_bits VDMA1_PARAM_3 24 24 0	// [24]     VDMA1中断模式 1: 按行中断 0:读取完成后中断按行中断每输出一行产生一个中断并停止执行需要写任意值到0x09000430计算下一行所有的行输出完成后写0x0900042c的指令将被忽略 
+#set_bits VDMA1_PARAM_3 23 16 0	// [23:16]  VDMA1二值化阈值 
+#set_bits VDMA1_PARAM_3 14  0 LAYER_4_INPUT_ROW_BYTES	// [14:0]   VDMA1读取图像时为原图一行的字节数(宽*像素字节数 读矩阵时为第一个矩阵一行的字节数(宽*单个数据字节数
+
+
+
+// 3x3分组卷积
+@export layer_4
+layer_4:
+	sv layer_rp_adr0 rp
+	// conv_params:
+	// .word 0 // VDMA1_PARAM0
+	// .word 0 // VDMA1_PARAM1
+	// .word 0 // VDMA1_PARAM2
+	// .word 0 // VDMA1_PARAM3
+	// .word 0 // input_wh_x2
+	// .word 0 // output_whc_x2
+	// .word 0 // c
+	// .word 0 // input_adr
+	// .word 0 // output_adr
+	// .word 0 // kernel_adr
+	// .word 0 // bias_adr
+	lcs ptr0 conv_params
+	svw ptr0 VDMA1_PARAM_0
+	svw ptr0 VDMA1_PARAM_1
+	svw ptr0 VDMA1_PARAM_2
+	svw ptr0 VDMA1_PARAM_3
+	sv  ptr0 7744 	// input_wh_x2:88*44*2
+	svw ptr0 34848 	// output_whc_x2:44*22*18*2
+	sv  ptr0 18 	// c:18
+	svw ptr0 layer_3_output
+	svw ptr0 layer_4_output
+	sw  ptr0 kernel_addr
+	sw  ptr0 bias_addr
+	call conv_grouped_k3snp1
+
+	lv rp layer_rp_adr0
+	ret

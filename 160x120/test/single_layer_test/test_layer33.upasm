@@ -1,0 +1,9 @@
+@import LAYER_33_INPUT
+@import LAYER_33_OUTPUT
+@import layer33_kernel
+
+$func conv1_96in_48out_whc(in input, in output, in kernels, in width_x_height)
+
+entry:
+	conv1_96in_48out_whc(LAYER_33_INPUT, LAYER_33_OUTPUT, layer33_kernel, 20*15)
+	hlt

@@ -1,0 +1,127 @@
+#include layer_memory.upinc
+#include "cmos_def.upinc"
+
+@import CMOS_INI_BF3901
+@import CMOS_INI_BF30a2
+
+#var VAR_BIT24_1 0
+#set_bits VAR_BIT24_1 24 24 1
+
+@import init_cmos
+@import IMAGE_INPUT_ADDR0
+@import IMAGE_INPUT_ADDR1
+@import TargetData
+
+$func transpos_120x160_padzeros(in input, in output)
+//$func extend_120x160_to_128x160(in input, in output)
+$func yolo_run(in image_adr)
+$func uart2_init()
+$func uart2_tx_data(in addr, in len)
+
+
+entry:
+	//uart2_init()
+	call init_cmos
+
+
+loop:
+	hlt 3
+
+	lvw r1 0x0900032c // r1=当前图像地址
+	lc r0 IMAGE_INPUT_ADDR0
+	svw 0x09000310 IMAGE_INPUT_ADDR0
+	ifu r1 == r0 { //双缓存切换
+		svw 0x09000310 IMAGE_INPUT_ADDR1 
+	}
+	cache_clr
+
+	
+	//hlt 15
+	
+	svw 0x09000040 3
+
+#if 1
+	//extend_120x160_to_128x160(r1, IMAGE_ADDR)
+	transpos_120x160_padzeros(r1, IMAGE_ADDR)
+	yolo_run(IMAGE_ADDR)
+	cache_clr
+
+	lc ptr0 TargetData
+	mov ptr1 r1
+
+	lw r2 ptr0 // r2 count
+	lw r3 ptr0 // r3 end_adr
+	sw ptr1 r2
+	whileu ptr0 < r3 {
+		lm s6 ptr0
+		l64 d0 ptr0
+
+		sw ptr1 s6_0
+		sw ptr1 s6_1
+		sw ptr1 s6_2
+		sw ptr1 s6_3
+		sw ptr1 d0_lo
+		sw ptr1 d0_hi
+	}
+
+	
+
+
+	//// 向uart写结果
+	//uart2_tx_data(head_data, 4)
+	//lc r1 TargetData
+	//lw r2 r1 4 // 偏移4字节后是结束地址
+	//sub r3 r2 r1 // 长度
+	//uart2_tx_data(r1, r3)
+
+#else
+
+	lcs r0 0
+	whileu r0 < 10 {
+		hlt 1000000
+		inc r0 1
+	}
+
+	uart2_tx_data(head_data, 4)
+	uart2_tx_data(zeros_data, 8)
+
+#endif
+	svw 0x09000444 r1 //SPI输出
+
+	lvw r31 0x09000040
+	jmp loop
+
+head_data:
+.byte 0xfa 0xfb 0xfc 0xfd
+
+zeros_data:
+.word 0 0
+
+$func uart2_init() {
+    svw 0x09000820, 0x40000b // baud_rate_div=串口时钟/16/baud_rate //波特率=115200, 起始位=1, 数据位=8, 校验位=0, 停止位=1 // 默认20M 0x0A == 115200
+    nop
+}
+
+/**
+ * 串口2 发送数据 串口2仅能做发送
+ * addr 缓存地址 
+ * len 表示发送的bytes
+ * [31:20]   UART0接收字节数, 写寄存器启动一次发送
+ * [15:0]    UART0发送数据缓存地址
+ */
+$func uart2_tx_data(in addr, in len) {
+    reg x0 x1
+
+_loop_uart2_busy:
+    lvw x0 0x0900082c
+    ifu x0 eb 6 {      // UART2发送忙标志; 发送busy时等待上一帧发送完成
+        jmp _loop_uart2_busy
+    }
+
+    load_reg x0 len
+    load_reg x1 addr
+    sl x0 x0 20
+    or x0 x0 x1
+    svw 0x09000824 x0
+    nop
+}

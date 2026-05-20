@@ -1,0 +1,320 @@
+#include yolo_layer.upinc
+
+$func check_rect_nmls(out ignore_box);
+
+@export yolo_data_adr_adr
+yolo_data_adr_adr:
+.word 0 
+
+@export yolo_layer_params
+yolo_layer_params:
+.word 0	// c6 adr
+.word 0 // c12 adr
+.word 0 // down_mul
+.word 0 // w
+.word 0 // h
+
+@export yolo_layer_init
+yolo_layer_init:
+	lc r0 RECT_ADR_START
+	add r1 r0 4
+	sw r0 r1
+
+#if ENABLE_SPI_OUT == 1
+	add ptr0 r0 4
+	lc r1 0x400
+	inc r0 r1
+	whileu ptr0 < r0 {
+		sw ptr0 0
+		sw ptr0 0
+		sw ptr0 0
+		sw ptr0 0
+	}
+#endif
+	ret
+
+
+//#define c6_ptr ptr0
+//#define c12_ptr ptr1
+//
+//
+//#define rect_count r2
+//#define max_count r3
+//#define thres r4
+//#define type r5
+//#define score_max0 r6
+//#define score_sum r6
+//#define score_max1 r7
+//
+//#define score_0 s4_0
+//#define score_1 s4_1
+//#define score_2 s4_2
+//#define score_3 s4_3
+//#define score_4 r8
+//#define score_5 r9
+//
+//#define logact_v r10
+//#define max_logact r11
+//#define m22p10_1 r12
+//
+//#define max_i r13
+//#define max_j r14
+//#define exp_k r15
+//#define m22p10_1024 r16
+//
+//#define i r17
+//#define j r18
+//
+//#define next_rj r22
+//#define type1_rj r23
+//#define type2_rj r24
+//#define rect1_rj r25
+//#define rect2_rj r26
+//
+//#define c12_0 s0
+//#define c12_1 s1
+//#define c12_2 s2
+
+#define exp_m22p10(res,v) \
+muls32 v v exp_k;\
+sl v v 4;\
+exp2_m16p16 res v;\
+srs res res 6;
+
+anchors_a:
+.short 25, 30, 100, 110, 155, 190,
+anchors_b:
+.short 260,430, 446,408, 525,535
+
+$func yolo_layer_update(in c6_adr, in c12_adr, in w, in h) {
+	reg rect_count thres type
+	reg i, j, max_i, max_j
+	reg max_sigmoid, min_sigmoid, m22p10_1, m22p10_1024, exp_k
+	reg sigmoid_v
+	reg next_rj, type1_rj, type2_rj, rect1_rj, rect2_rj
+	reg anchor_ptr, down_mul
+	reg score_4, score_5, score_max0, score_max1
+	reg rj_0, rj_1, rj_2
+	reg score_sum(score_max0)
+	reg anchor_a(score_4), anchor_b(score_5)
+	reg tmp(score_max1), rect_adr(score_4), rect_end(score_5)
+
+#define score_0 s4_0
+#define score_1 s4_1
+#define score_2 s4_2
+#define score_3 s4_3
+#define c12_0 d0
+#define c12_1 d1
+#define c12_2 d2
+#define rect s5
+#define rect_0 s5_0
+#define rect_1 s5_1
+#define rect_2 s5_2
+#define rect_3 s5_3
+#define c6_ptr ptr0
+#define c12_ptr ptr1
+#define a_ptr ptr2
+	jmp func_start
+
+// 1.0f / (1.0f + expf(-x));
+sigmoid:
+	neg sigmoid_v sigmoid_v // -x
+	ifs sigmoid_v >= max_sigmoid {
+		// -x大于7, 直接返回0
+		mov sigmoid_v 0
+		ret
+	}
+	ifs sigmoid_v <= min_sigmoid {
+		mov sigmoid_v m22p10_1
+		ret
+	}
+	exp_m22p10(sigmoid_v,sigmoid_v)
+	inc sigmoid_v m22p10_1
+	divs32 sigmoid_v m22p10_1024 sigmoid_v
+	ret
+
+func_start:	
+	load_reg c6_ptr c6_adr
+	load_reg c12_ptr c12_adr
+	load_reg max_j w
+	load_reg max_i h
+
+	lcs anchor_ptr anchors_a
+	lcs down_mul 16
+	ifu max_j == 10 {
+		lcs anchor_ptr anchors_b
+		lcs down_mul 32
+	}
+	sl max_i max_i 10
+	sl max_j max_j 10
+	lcs tmp 512
+	sub max_i max_i tmp
+	sub max_j max_j tmp
+
+	lcs exp_k 1477			// log2(e):  1.442695*(2^10)
+	lcs max_sigmoid 7168 	// 7.0 in m26p10, e^7=1096.6... > 1024
+	lc min_sigmoid, -7168	// -7.0 
+	lcs m22p10_1 1024
+	lc m22p10_1024 1048576 	// 1024*1024
+	lc thres 460			// 0.45*1024
+
+	lcs next_rj check_next
+	lcs type1_rj type1
+	lcs type2_rj type2	
+	lcs rect1_rj rect1
+	lcs rect2_rj rect2
+	lc i, -512
+
+	$jump_regs rj_0 rj_1 rj_2
+	whiles i < max_i {
+
+		lc j, -512
+		whiles j < max_j {
+			lw d0_lo c6_ptr
+			lw d0_hi c6_ptr
+			lsl score_4 c6_ptr
+			lsl score_5 c6_ptr
+			simd_16to32 s4 d0
+
+			l64_d c12_0 c12_ptr
+			l64_d c12_1 c12_ptr
+			l64_d c12_2 c12_ptr
+
+			mov sigmoid_v score_3
+			call sigmoid
+			mov score_3 sigmoid_v
+
+			mov sigmoid_v score_4
+			call sigmoid
+			mov score_4 sigmoid_v
+
+			mov sigmoid_v score_5
+			call sigmoid
+			mov score_5 sigmoid_v
+
+			max score_max1 score_3 score_4
+			max score_max1 score_max1 score_5
+			cjmpsl next_rj score_max1 thres // if (smax_0 < THRES_FLOAT)continue;
+
+			cjmpe rect1_rj score_max1 score_4 
+			cjmpe rect2_rj score_max1 score_5 
+			mov a_ptr anchor_ptr
+			simd_16to32 rect c12_0
+			jmp end_rect
+rect1:
+			add a_ptr anchor_ptr 4
+			simd_16to32 rect c12_1
+			jmp end_rect
+rect2:
+			add a_ptr anchor_ptr 8
+			simd_16to32 rect c12_2
+			jmp end_rect
+end_rect:
+
+
+			//
+			// softmax
+			// 
+			// float s0 = expf(c3_0[0]);
+            // float s1 = expf(c3_0[1]);
+            // float s2 = expf(c3_0[2]);
+            // float sum = 1.0f / (s0 + s1 + s2);
+            // s0 *= sum;
+            // s1 *= sum;
+            // s2 *= sum;
+            // float smax_0 = fmaxf(fmaxf(s0, s1), s2);
+			exp_m22p10(score_0, score_0)
+			exp_m22p10(score_1, score_1)
+			exp_m22p10(score_2, score_2)
+			add score_sum score_0 score_1
+			add score_sum score_sum score_2
+			cjmpe next_rj score_sum 0
+
+			sl32 d1 score_0 10
+			sl32 d2 score_1 10
+			sl32 d3 score_2 10
+			divs64_32 d1 d1 score_sum
+			divs64_32 d2 d2 score_sum
+			divs64_32 d3 d3 score_sum
+			mov score_0 d1_lo
+			mov score_1 d2_lo
+			mov score_2 d3_lo
+
+			max score_max0 score_0 score_1
+			max score_max0 score_max0 score_2
+			cjmpsl next_rj score_max0 thres // if (smax_0 < THRES_FLOAT)continue;
+
+			cjmpe type1_rj score_max0 score_1
+			cjmpe type2_rj score_max0 score_2
+			mov type 0
+			jmp end_type
+type1:
+			mov type 1
+			jmp end_type
+type2:
+			mov type 2
+			jmp end_type
+end_type:
+
+			muls32 score_max0 score_max0 score_max1
+			srs score_max0 score_max0 10
+			cjmpsl next_rj score_max0 thres // if (smax_0 < THRES_FLOAT)continue;
+
+
+			lsl anchor_a a_ptr
+			lsl anchor_b a_ptr
+			// w = powf(sigmoid(p12[2]) * 2, 2) * panchor[0];
+			mov sigmoid_v rect_2
+			call sigmoid
+			sl sigmoid_v sigmoid_v 1
+			muls32 sigmoid_v sigmoid_v sigmoid_v
+			srs sigmoid_v sigmoid_v 10
+			muls32 rect_2 sigmoid_v anchor_a
+
+			// h = powf(sigmoid(p12[3]) * 2, 2) * panchor[1];
+			mov sigmoid_v rect_3
+			call sigmoid
+			sl sigmoid_v sigmoid_v 1
+			muls32 sigmoid_v sigmoid_v sigmoid_v
+			srs sigmoid_v sigmoid_v 10
+			muls32 rect_3 sigmoid_v anchor_b
+
+			// x = ((sigmoid(p12[0]) * 2 - 0.5 + j) * down_mul) - w/2
+			mov sigmoid_v rect_0
+			call sigmoid
+			sl sigmoid_v sigmoid_v 1
+			inc sigmoid_v j
+			muls32 rect_0 sigmoid_v down_mul
+			srs tmp rect_2 1
+			sub rect_0 rect_0 tmp
+
+			// y = ((sigmoid(p12[1]) * 2 - 0.5 + i) * down_mul) - h/2
+			mov sigmoid_v rect_1
+			call sigmoid
+			sl sigmoid_v sigmoid_v 1
+			inc sigmoid_v i
+			muls32 rect_1 sigmoid_v down_mul
+			srs tmp rect_3 1
+			sub rect_1 rect_1 tmp
+
+			mov s4_0 type
+			mov s4_1 score_max0
+			check_rect_nmls(tmp)
+			ifu tmp == 0 {
+				lcs rect_end RECT_ADR_END
+				lcs rect_adr RECT_ADR_START
+				lw tmp rect_adr
+				sm tmp s4
+				sm tmp s5 16
+				inc tmp 32
+				sw rect_adr tmp
+
+				cjmpuge rj_0 tmp rect_end
+			}
+check_next:
+			inc j m22p10_1
+		}
+		inc i m22p10_1
+	}
+	$jump_regs end
+}

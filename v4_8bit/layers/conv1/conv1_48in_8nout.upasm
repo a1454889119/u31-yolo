@@ -1,0 +1,605 @@
+#include layer_param.upinc
+#include yolo_funcs.upinc // for SAVE_WHC/SAVE_CWH/SAVE_WHC_CWH
+#include layer_regs.upinc
+#define in0 s0
+#define in1 s1
+#define in2 s2
+#define in3 s3
+#define in4 s7
+#define in5 s8
+#define in16 s6
+#define in16_p0 s6_01
+#define in16_p1 s6_23
+
+#define kn s13
+#define b_03 s4
+#define b0 s4_0
+#define b1 s4_1
+#define b2 s4_2
+#define b3 s4_3
+#define b_47 s5
+#define b4 s5_0
+#define b5 s5_1
+#define b6 s5_2
+#define b7 s5_3
+
+
+#define ktmp s6
+#define kscale s14
+#define kzero_point s15
+
+#define i r18
+#define j r19
+#define rj0 r20
+#define rj1 r21
+
+#define outptr_whc outptr
+#define kptr ptr2
+#define bptr ptr3
+#define outptr_cwh ptr4
+
+@export conv1_48in_8nout
+conv1_48in_8nout:
+	mov inptr inadr
+	simd_ext32 kscale layer_scale
+	simd_ext32 kzero_point layer_zeropt
+	sl nFlag nFlag 3 // n *= 8
+
+
+#define CONV_ONE(t) \
+lm_d kn kptr;\
+simd_mac16_8 t kn in0;\
+lm_d kn kptr;\
+simd_mac16_8 t kn in1;\
+lm_d kn kptr;\
+simd_mac16_8 t kn in2;\
+lm_d kn kptr;\
+simd_mac16_8 t kn in3;\
+lm_d kn kptr;\
+simd_mac16_8 t kn in4;\
+lm_d kn kptr;\
+simd_mac16_8 t kn in5;
+
+	// 设置ptr0偏移值为wxh
+	lc j 0x10000
+	or i outwxh j
+	svw 0x09000058, i
+	lcs d2_lo 0xc840
+
+	lc i WHC_8BIT
+	cjmpe i saveFlag SAVE_WHC
+	lc i CWH_8BIT
+	cjmpe i saveFlag SAVE_CWH
+	lc i WHC_CWH_8BIT
+	cjmpe i saveFlag SAVE_WHC_CWH
+	lc i WHC_16BIT
+	cjmpe i saveFlag SAVE_WHC_16BIT
+	jmp END
+
+WHC_8BIT:
+	lcs i 0
+	$jump_regs rj0 rj1
+	whileu i < outwxh {
+		lm_d in16 inptr
+		mov kptr kadr
+		simd_8to16 in0 in16_p0
+		simd_8to16 in1 in16_p1
+		lm_d in16 inptr
+		mov bptr badr
+		simd_8to16 in2 in16_p0
+		simd_8to16 in3 in16_p1
+		lm_d in16 inptr
+		mov outptr_whc outadr
+		simd_8to16 in4 in16_p0
+		simd_8to16 in5 in16_p1
+
+		lcs j 0
+		whileu j < nFlag {
+			lm_d  b_03 bptr
+			lm_d  b_47 bptr
+			CONV_ONE(b0)
+			CONV_ONE(b1)
+			CONV_ONE(b2)
+			CONV_ONE(b3)
+			CONV_ONE(b4)
+			CONV_ONE(b5)
+			CONV_ONE(b6)
+			CONV_ONE(b7)
+
+			simd_leaky d0 b_03 layer_mulshift
+			simd_16to32 b_03 d0
+			simd_i32f32 b_03 b_03 31
+			simd_fmul b_03 b_03 kscale
+			simd_fsub b_03 b_03 kzero_point
+			simd_f32i32 ktmp b_03 30
+			simd_f32i32 b_03 b_03 31
+			simd_sub32 b_03 ktmp b_03
+
+			simd_leaky d0 b_47 layer_mulshift
+			simd_16to32 b_47 d0
+			simd_i32f32 b_47 b_47 31
+			simd_fmul b_47 b_47 kscale
+			simd_fsub b_47 b_47 kzero_point
+			simd_f32i32 ktmp b_47 30
+			simd_f32i32 b_47 b_47 31
+			simd_sub32 b_47 ktmp b_47
+
+			//call save_func
+			sbyte outptr_whc b0
+			sbyte outptr_whc b1
+			sbyte outptr_whc b2
+			sbyte outptr_whc b3
+			sbyte outptr_whc b4
+			sbyte outptr_whc b5
+			sbyte outptr_whc b6
+			sbyte outptr_whc b7
+		
+			inc j 8
+		}
+		inc i 1
+		inc outadr 1
+	}
+	$jump_regs end
+	jmp END
+
+CWH_8BIT:
+	sub outstride outstride nFlag
+	mov outptr_cwh outadr
+	lcs i 0
+	$jump_regs rj0 rj1
+	whileu i < outwxh {
+		lm_d in16 inptr
+		mov kptr kadr
+		simd_8to16 in0 in16_p0
+		simd_8to16 in1 in16_p1
+		lm_d in16 inptr
+		mov bptr badr
+		simd_8to16 in2 in16_p0
+		simd_8to16 in3 in16_p1
+		lm_d in16 inptr
+		mov outptr_whc outadr
+		simd_8to16 in4 in16_p0
+		simd_8to16 in5 in16_p1
+
+		lcs j 0
+		whileu j < nFlag {
+			lm_d  b_03 bptr
+			lm_d  b_47 bptr
+			CONV_ONE(b0)
+			CONV_ONE(b1)
+			CONV_ONE(b2)
+			CONV_ONE(b3)
+			CONV_ONE(b4)
+			CONV_ONE(b5)
+			CONV_ONE(b6)
+			CONV_ONE(b7)
+
+			simd_leaky d0 b_03 layer_mulshift
+			simd_16to32 b_03 d0
+			simd_i32f32 b_03 b_03 31
+			simd_fmul b_03 b_03 kscale
+			simd_fsub b_03 b_03 kzero_point
+			simd_f32i32 ktmp b_03 30
+			simd_f32i32 b_03 b_03 31
+			simd_sub32 b_03 ktmp b_03
+
+			simd_leaky d0 b_47 layer_mulshift
+			simd_16to32 b_47 d0
+			simd_i32f32 b_47 b_47 31
+			simd_fmul b_47 b_47 kscale
+			simd_fsub b_47 b_47 kzero_point
+			simd_f32i32 ktmp b_47 30
+			simd_f32i32 b_47 b_47 31
+			simd_sub32 b_47 ktmp b_47
+	
+			//call save_func
+			simd_shuffle8 b_03 b_03 d2
+			simd_shuffle8 b_47 b_47 d2
+			sw outptr_cwh b0
+			sw outptr_cwh b4
+
+			inc j 8
+		}
+		inc i 1
+		inc outadr 1
+		inc outptr_cwh outstride
+	}
+	$jump_regs end
+	jmp END
+
+WHC_CWH_8BIT:
+	sub outstride outstride nFlag
+	mov outptr_cwh outadr2
+	lcs i 0
+	$jump_regs rj0 rj1
+	whileu i < outwxh {
+		lm_d in16 inptr
+		mov kptr kadr
+		simd_8to16 in0 in16_p0
+		simd_8to16 in1 in16_p1
+		lm_d in16 inptr
+		mov bptr badr
+		simd_8to16 in2 in16_p0
+		simd_8to16 in3 in16_p1
+		lm_d in16 inptr
+		mov outptr_whc outadr
+		simd_8to16 in4 in16_p0
+		simd_8to16 in5 in16_p1
+
+		lcs j 0
+		whileu j < nFlag {
+			lm_d  b_03 bptr
+			lm_d  b_47 bptr
+			CONV_ONE(b0)
+			CONV_ONE(b1)
+			CONV_ONE(b2)
+			CONV_ONE(b3)
+			CONV_ONE(b4)
+			CONV_ONE(b5)
+			CONV_ONE(b6)
+			CONV_ONE(b7)
+
+			simd_leaky d0 b_03 layer_mulshift
+			simd_16to32 b_03 d0
+			simd_i32f32 b_03 b_03 31
+			simd_fmul b_03 b_03 kscale
+			simd_fsub b_03 b_03 kzero_point
+			simd_f32i32 ktmp b_03 30
+			simd_f32i32 b_03 b_03 31
+			simd_sub32 b_03 ktmp b_03
+
+			simd_leaky d0 b_47 layer_mulshift
+			simd_16to32 b_47 d0
+			simd_i32f32 b_47 b_47 31
+			simd_fmul b_47 b_47 kscale
+			simd_fsub b_47 b_47 kzero_point
+			simd_f32i32 ktmp b_47 30
+			simd_f32i32 b_47 b_47 31
+			simd_sub32 b_47 ktmp b_47
+	
+			//call save_func
+			sbyte outptr_whc b0
+			sbyte outptr_whc b1
+			sbyte outptr_whc b2
+			sbyte outptr_whc b3
+			sbyte outptr_whc b4
+			sbyte outptr_whc b5
+			sbyte outptr_whc b6
+			sbyte outptr_whc b7
+			simd_shuffle8 b_03 b_03 d2
+			simd_shuffle8 b_47 b_47 d2
+			sw outptr_cwh b0
+			sw outptr_cwh b4
+			
+			inc j 8
+		}
+		inc i 1
+		inc outadr 1
+		inc outptr_cwh outstride
+	}
+	$jump_regs end
+	jmp END
+
+WHC_16BIT:
+	lc j 0x10000
+	sl i outwxh 1
+	or i i j
+	svw 0x09000058, i
+
+
+	lcs i 0
+	$jump_regs rj0 rj1
+	whileu i < outwxh {
+		lm_d in16 inptr
+		mov kptr kadr
+		simd_8to16 in0 in16_p0
+		simd_8to16 in1 in16_p1
+		lm_d in16 inptr
+		mov bptr badr
+		simd_8to16 in2 in16_p0
+		simd_8to16 in3 in16_p1
+		lm_d in16 inptr
+		mov outptr_whc outadr
+		simd_8to16 in4 in16_p0
+		simd_8to16 in5 in16_p1
+
+		lcs j 0
+		whileu j < nFlag {
+			lm_d  b_03 bptr
+			lm_d  b_47 bptr
+			CONV_ONE(b0)
+			CONV_ONE(b1)
+			CONV_ONE(b2)
+			CONV_ONE(b3)
+			CONV_ONE(b4)
+			CONV_ONE(b5)
+			CONV_ONE(b6)
+			CONV_ONE(b7)
+
+			simd_leaky d0 b_03 layer_mulshift
+			inc j 8
+			simd_leaky d1 b_47 layer_mulshift
+
+			//call save_func
+			ssl outptr_whc d0_lo
+			ss  outptr_whc d0_lo
+			ssl outptr_whc d0_hi
+			ss  outptr_whc d0_hi
+			ssl outptr_whc d1_lo
+			ss  outptr_whc d1_lo
+			ssl outptr_whc d1_hi
+			ss  outptr_whc d1_hi
+		}
+		inc i 1
+		inc outadr 2
+	}
+	$jump_regs end
+END:
+	// ptr0 偏移值写回0
+	svw 0x09000058 0
+	ret
+
+/*
+#define outptr_whc ptr0
+#define inptr ptr1
+#define kptr ptr2
+#define bptr ptr3
+#define outptr_cwh ptr4
+$func conv1_48in_8nout(in nn, in outtype) {
+	reg i, j, wxh, bstart, kadr, res, outadr, n, outs
+	reg rj0, rj1, scale, zero_pt, mulshift
+	reg param_ptr(rj0), save_func(scale)
+
+	lc param_ptr, LAYER_PARAM_ADDR
+	lw inptr param_ptr, INPUT_ADDR_OFF
+	lw outadr param_ptr, OUTPUT_ADDR_OFF
+	lw bstart param_ptr, BIAS_ADDR_OFF
+	lw scale param_ptr, SCALE_OFF
+	lw zero_pt param_ptr, ZERO_POINT_OFF
+	lw mulshift param_ptr, MUL_SHIFT_OFF
+	lw wxh param_ptr, OUTW_OFF
+	lw i param_ptr, OUTH_OFF
+	
+	muls16 wxh wxh i
+	lw kadr param_ptr, KERNEL_ADDR_OFF
+	simd_ext32 kscale scale
+	simd_ext32 kzero_point zero_pt
+	load_reg n nn
+	sl n n 3 // n *= 8
+
+#define CONV_ONE(t) \
+lm_d kn kptr;\
+simd_mac16_8 t kn in0;\
+lm_d kn kptr;\
+simd_mac16_8 t kn in1;\
+lm_d kn kptr;\
+simd_mac16_8 t kn in2;\
+lm_d kn kptr;\
+simd_mac16_8 t kn in3;\
+lm_d kn kptr;\
+simd_mac16_8 t kn in4;\
+lm_d kn kptr;\
+simd_mac16_8 t kn in5;
+
+	// 设置ptr0偏移值为wxh
+	lc j 0x10000
+	or i wxh j
+	svw 0x09000058, i
+	lcs d2_lo 0xc840
+
+	load_reg save_func outtype
+	ifu save_func == SAVE_WHC {
+		mov outptr_cwh 0
+		mov outs 0
+
+		lcs i 0
+		$jump_regs rj0 rj1
+		whileu i < wxh {
+			lm_d in16 inptr
+			mov kptr kadr
+			simd_8to16 in0 in16_p0
+			simd_8to16 in1 in16_p1
+			lm_d in16 inptr
+			mov bptr bstart
+			simd_8to16 in2 in16_p0
+			simd_8to16 in3 in16_p1
+			lm_d in16 inptr
+			mov outptr_whc outadr
+			simd_8to16 in4 in16_p0
+			simd_8to16 in5 in16_p1
+	
+			lcs j 0
+			whileu j < n {
+				lm_d  b_03 bptr
+				lm_d  b_47 bptr
+				CONV_ONE(b0)
+				CONV_ONE(b1)
+				CONV_ONE(b2)
+				CONV_ONE(b3)
+				CONV_ONE(b4)
+				CONV_ONE(b5)
+				CONV_ONE(b6)
+				CONV_ONE(b7)
+	
+				simd_leaky d0 b_03 mulshift
+				simd_16to32 b_03 d0
+				simd_i32f32 b_03 b_03 31
+				simd_fmul b_03 b_03 kscale
+				simd_fsub b_03 b_03 kzero_point
+				simd_f32i32 ktmp b_03 30
+				simd_f32i32 b_03 b_03 31
+				simd_sub32 b_03 ktmp b_03
+	
+				simd_leaky d0 b_47 mulshift
+				simd_16to32 b_47 d0
+				simd_i32f32 b_47 b_47 31
+				simd_fmul b_47 b_47 kscale
+				simd_fsub b_47 b_47 kzero_point
+				simd_f32i32 ktmp b_47 30
+				simd_f32i32 b_47 b_47 31
+				simd_sub32 b_47 ktmp b_47
+	
+				//call save_func
+				sbyte outptr_whc b0
+				sbyte outptr_whc b1
+				sbyte outptr_whc b2
+				sbyte outptr_whc b3
+				sbyte outptr_whc b4
+				sbyte outptr_whc b5
+				sbyte outptr_whc b6
+				sbyte outptr_whc b7
+			
+				inc j 8
+			}
+			inc i 1
+			inc outadr 1
+			inc outptr_cwh outs
+		}
+		$jump_regs end
+
+	} else {
+		lw outs param_ptr, OUT_STRIDE_OFF
+		sub outs outs n
+		ifu save_func == SAVE_CWH {
+			mov outptr_cwh outadr
+
+			lcs i 0
+			$jump_regs rj0 rj1
+			whileu i < wxh {
+				lm_d in16 inptr
+				mov kptr kadr
+				simd_8to16 in0 in16_p0
+				simd_8to16 in1 in16_p1
+				lm_d in16 inptr
+				mov bptr bstart
+				simd_8to16 in2 in16_p0
+				simd_8to16 in3 in16_p1
+				lm_d in16 inptr
+				mov outptr_whc outadr
+				simd_8to16 in4 in16_p0
+				simd_8to16 in5 in16_p1
+		
+				lcs j 0
+				whileu j < n {
+					lm_d  b_03 bptr
+					lm_d  b_47 bptr
+					CONV_ONE(b0)
+					CONV_ONE(b1)
+					CONV_ONE(b2)
+					CONV_ONE(b3)
+					CONV_ONE(b4)
+					CONV_ONE(b5)
+					CONV_ONE(b6)
+					CONV_ONE(b7)
+		
+					simd_leaky d0 b_03 mulshift
+					simd_16to32 b_03 d0
+					simd_i32f32 b_03 b_03 31
+					simd_fmul b_03 b_03 kscale
+					simd_fsub b_03 b_03 kzero_point
+					simd_f32i32 ktmp b_03 30
+					simd_f32i32 b_03 b_03 31
+					simd_sub32 b_03 ktmp b_03
+		
+					simd_leaky d0 b_47 mulshift
+					simd_16to32 b_47 d0
+					simd_i32f32 b_47 b_47 31
+					simd_fmul b_47 b_47 kscale
+					simd_fsub b_47 b_47 kzero_point
+					simd_f32i32 ktmp b_47 30
+					simd_f32i32 b_47 b_47 31
+					simd_sub32 b_47 ktmp b_47
+			
+					//call save_func
+					simd_shuffle8 b_03 b_03 d2
+					simd_shuffle8 b_47 b_47 d2
+					sw outptr_cwh b0
+					sw outptr_cwh b4
+	
+					inc j 8
+				}
+				inc i 1
+				inc outadr 1
+				inc outptr_cwh outs
+			}
+			$jump_regs end
+
+		} else {
+			lw outptr_cwh param_ptr, OUTPUT_ADDR2_OFF
+
+			lcs i 0
+			$jump_regs rj0 rj1
+			whileu i < wxh {
+				lm_d in16 inptr
+				mov kptr kadr
+				simd_8to16 in0 in16_p0
+				simd_8to16 in1 in16_p1
+				lm_d in16 inptr
+				mov bptr bstart
+				simd_8to16 in2 in16_p0
+				simd_8to16 in3 in16_p1
+				lm_d in16 inptr
+				mov outptr_whc outadr
+				simd_8to16 in4 in16_p0
+				simd_8to16 in5 in16_p1
+		
+				lcs j 0
+				whileu j < n {
+					lm_d  b_03 bptr
+					lm_d  b_47 bptr
+					CONV_ONE(b0)
+					CONV_ONE(b1)
+					CONV_ONE(b2)
+					CONV_ONE(b3)
+					CONV_ONE(b4)
+					CONV_ONE(b5)
+					CONV_ONE(b6)
+					CONV_ONE(b7)
+		
+					simd_leaky d0 b_03 mulshift
+					simd_16to32 b_03 d0
+					simd_i32f32 b_03 b_03 31
+					simd_fmul b_03 b_03 kscale
+					simd_fsub b_03 b_03 kzero_point
+					simd_f32i32 ktmp b_03 30
+					simd_f32i32 b_03 b_03 31
+					simd_sub32 b_03 ktmp b_03
+		
+					simd_leaky d0 b_47 mulshift
+					simd_16to32 b_47 d0
+					simd_i32f32 b_47 b_47 31
+					simd_fmul b_47 b_47 kscale
+					simd_fsub b_47 b_47 kzero_point
+					simd_f32i32 ktmp b_47 30
+					simd_f32i32 b_47 b_47 31
+					simd_sub32 b_47 ktmp b_47
+			
+					//call save_func
+					sbyte outptr_whc b0
+					sbyte outptr_whc b1
+					sbyte outptr_whc b2
+					sbyte outptr_whc b3
+					sbyte outptr_whc b4
+					sbyte outptr_whc b5
+					sbyte outptr_whc b6
+					sbyte outptr_whc b7
+					simd_shuffle8 b_03 b_03 d2
+					simd_shuffle8 b_47 b_47 d2
+					sw outptr_cwh b0
+					sw outptr_cwh b4
+					
+					inc j 8
+				}
+				inc i 1
+				inc outadr 1
+				inc outptr_cwh outs
+			}
+			$jump_regs end
+		}
+	}
+	
+	// ptr0 偏移值写回0
+	svw 0x09000058 0
+	nop
+}
+*/

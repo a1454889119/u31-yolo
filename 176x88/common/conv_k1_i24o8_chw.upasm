@@ -1,0 +1,108 @@
+
+#define wh_x8 r0
+#define wh_x16 r1
+#define input_end r2
+#define input_start r3
+#define bias_ptr r4
+#define i r5
+#define output_start r6
+#define output_ptr r7
+
+#define k0_0 s0
+#define k0_1 s1
+#define k0_2 s2
+#define k1_0 s3
+#define k1_1 s15
+#define k1_2 s5
+#define k2_0 s6
+#define k2_1 s7
+#define k2_2 s8
+#define k3_0 s12
+#define k3_1 s13
+#define k3_2 s14
+
+#define in_0 s9
+#define in_1 s10
+#define in_2 s11
+
+#define bres s4
+#define bres_0 s4_0
+#define bres_1 s4_1
+#define bres_2 s4_2
+#define bres_3 s4_3
+ 
+#define input_ptr ptr0
+#define kernel_ptr ptr1
+
+#export conv_k1_i24o8_params
+conv_k1_i24o8_params:
+.word 0 // input_adr
+.word 0 // input_end
+.word 0 // kernel_adr
+.word 0 // bias_adr
+.word 0 // output_adr
+
+#export conv_k1_i24o8_cwh
+conv_k1_i24o8_cwh:
+	lcs ptr2 conv_k1_i24o8_params
+	nop
+	lw input_ptr ptr2
+	lw input_end ptr2
+	lw kernel_ptr ptr2
+	lw bias_ptr ptr2
+	lw output_ptr ptr2
+
+	mov output_start output_ptr
+	mov input_start input_ptr
+	
+	lcs i 0
+	#jump-regs r20 r21 r22
+	// 2轮, 每轮得到4个输出通道
+	whileu i < 2 {
+		lm k0_0 kernel_ptr
+		lm k0_1 kernel_ptr
+		lm k0_2 kernel_ptr
+		lm k1_0 kernel_ptr
+		lm k1_1 kernel_ptr
+		lm k1_2 kernel_ptr
+		lm k2_0 kernel_ptr
+		lm k2_1 kernel_ptr
+		lm k2_2 kernel_ptr
+		lm k3_0 kernel_ptr
+		lm k3_1 kernel_ptr
+		lm k3_2 kernel_ptr
+		
+		mov output_ptr output_start
+		mov input_ptr input_start
+		whileu input_ptr < input_end {
+			lm bres bias_ptr
+			lm in_0 input_ptr
+			lm in_1 input_ptr
+			lm in_2 input_ptr
+			
+			simd_muladd bres_0 k0_0 in_0
+			simd_muladd bres_1 k1_0 in_0
+			simd_muladd bres_2 k2_0 in_0
+			simd_muladd bres_3 k3_0 in_0
+
+			simd_muladd bres_0 k0_1 in_1
+			simd_muladd bres_1 k1_1 in_1
+			simd_muladd bres_2 k2_1 in_1
+			simd_muladd bres_3 k3_1 in_1
+
+			simd_muladd bres_0 k0_2 in_2			
+			simd_muladd bres_1 k1_2 in_2
+			simd_muladd bres_2 k2_2 in_2
+			simd_muladd bres_3 k3_2 in_2
+
+			inc output_ptr 16
+			nop
+			nop
+			simd_linear d0 bres 10
+			s64 output_ptr d0 -16
+		}
+		inc bias_ptr 16
+		inc output_start 8
+		inc i 1
+	}
+	ret

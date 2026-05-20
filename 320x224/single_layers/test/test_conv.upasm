@@ -1,0 +1,50 @@
+
+#include conv1.upinc
+
+#define INC 144
+#define OUTC 36
+#define W 20
+#define H 14
+
+test_kernel:
+.reserve INC*OUTC*2
+
+test_bias:
+.reserve INC*4
+
+test_input:
+.reserve W*H*INC*2
+
+test_output:
+.reserve W*H*OUTC*2
+
+test_adr:
+.short 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+.short 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+.short 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+.short 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+
+@import conv1_144_36
+
+entry:
+
+	
+
+	lcs conv1_w W
+	lcs conv1_h H
+	lcs conv1_in_stride, INC*2
+	lcs conv1_out_stride, OUTC*2
+	lcs conv1_in_adr test_input
+	lc conv1_out_adr test_output
+	lcs conv1_kernel_adr test_kernel
+	lcs conv1_bias_adr test_bias
+
+	lc r30,0x09000040
+	sw r30,3
+
+	call conv1_144_36
+
+	lc r30,0x09000040
+	lw r31,r30
+
+	hlt

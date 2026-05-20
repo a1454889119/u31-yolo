@@ -1,0 +1,175 @@
+#define b_03 s4
+#define b0 s4_0
+#define b1 s4_1
+#define b2 s4_2
+#define b3 s4_3
+
+#define k0_0 s0
+#define k0_1 s1
+#define k1_0 s2
+#define k1_1 s3
+#define k2_0 s5
+#define k2_1 s6
+
+
+#define in_0 s7
+#define in_1 s8
+
+#define k0_2 s9
+#define k1_2 s10
+#define k2_2 s11
+#define in_2 s12
+
+#define outptr ptr0
+#define inptr ptr1
+#define kptr ptr2
+#define bptr ptr3
+
+$func conv1_24in_20out_linear_whc(in input, in output, in kernels, in width_x_height) {
+	reg i, j, wxh, bstart, kadr, outadr
+	reg rj0, rj1
+	nop
+	load_reg kadr kernels
+	load_reg inptr input
+	load_reg outadr output
+	load_reg wxh width_x_height
+
+	// 设置ptr0偏移值为wxh*2
+	add i wxh wxh
+	lc j 0x10000
+	or i i j
+	svw 0x09000058, i
+
+	lcs bstart, 24*20*2
+	inc bstart kadr
+	lcs i 0
+	$jump_regs rj0
+	whileu i < wxh {
+		lm_d in_0 inptr
+		lm_d in_1 inptr
+		lm_d in_2 inptr
+
+		mov bptr bstart
+		mov kptr kadr
+		mov outptr outadr
+		lcs j 0
+		whileu j < 5 {
+			lm_d  b_03 bptr
+			lm_d  k0_0 kptr
+			lm_d  k0_1 kptr
+			lm_d  k0_2 kptr
+			lm_d  k1_0 kptr
+			lm_d  k1_1 kptr
+			lm_d  k1_2 kptr
+			lm_d  k2_0 kptr
+			lm_d  k2_1 kptr
+			lm_d  k2_2 kptr
+			simd_mac16_8 b0 k0_0 in_0
+			lm_d  k0_0 kptr
+			simd_mac16_8 b3 k0_0 in_0
+			simd_mac16_8 b1 k1_0 in_0
+			simd_mac16_8 b2 k2_0 in_0
+
+			simd_mac16_8 b0 k0_1 in_1
+			lm_d  k0_1 kptr
+			simd_mac16_8 b3 k0_1 in_1
+			simd_mac16_8 b1 k1_1 in_1
+			simd_mac16_8 b2 k2_1 in_1
+
+			simd_mac16_8 b0 k0_2 in_2
+			lm_d  k0_2 kptr
+			simd_mac16_8 b3 k0_2 in_2
+			simd_mac16_8 b1 k1_2 in_2
+			simd_mac16_8 b2 k2_2 in_2
+
+			inc j 1
+			nop
+			simd_linear d0 b_03 10
+			nop
+			ssl outptr d0_lo
+			ss  outptr d0_lo
+			ssl outptr d0_hi
+			ss  outptr d0_hi
+		}
+		inc outadr 2
+		inc i 1
+	}
+	$jump_regs end
+	// ptr0 偏移值写回0
+	svw 0x09000058 0
+	nop
+}
+
+#undef k0_2
+#undef k1_2
+#undef k2_2
+#undef in_2
+
+#define k0_2 d0
+#define k1_2 d1
+#define k2_2 d2
+#define in_2 d3
+
+$func conv1_20in_20out_linear_cwh(in input, in output, in kernels, in width_x_height, in outstride) {
+	reg i, j, wxh, bstart, kadr, outs
+	reg rj0, rj1
+	nop
+	load_reg kadr kernels
+	load_reg inptr input
+	load_reg outptr output
+	load_reg wxh width_x_height
+	load_reg outs outstride
+
+	sub outs outs 40
+	lcs bstart, 20*20*2
+	inc bstart kadr
+	lcs i 0
+	$jump_regs rj0 rj1
+	whileu i < wxh {
+		lm_d in_0 inptr
+		lm_d in_1 inptr
+		l64_d in_2 inptr
+
+		mov bptr bstart
+		mov kptr kadr
+
+		lcs j 0
+		whileu j < 5 {
+			lm_d  b_03 bptr
+			lm_d  k0_0 kptr
+			lm_d  k0_1 kptr
+			l64_d  k0_2 kptr
+			lm_d  k1_0 kptr
+			lm_d  k1_1 kptr
+			l64_d  k1_2 kptr
+			lm_d  k2_0 kptr
+			lm_d  k2_1 kptr
+			l64_d  k2_2 kptr
+			simd_mac16_8 b0 k0_0 in_0
+			lm_d  k0_0 kptr
+			simd_mac16_8 b3 k0_0 in_0
+			simd_mac16_8 b1 k1_0 in_0
+			simd_mac16_8 b2 k2_0 in_0
+
+			simd_mac16_8 b0 k0_1 in_1
+			lm_d  k0_1 kptr
+			simd_mac16_8 b3 k0_1 in_1
+			simd_mac16_8 b1 k1_1 in_1
+			simd_mac16_8 b2 k2_1 in_1
+
+			simd_mac16_4 b0 k0_2 in_2
+			l64_d  k0_2 kptr
+			simd_mac16_4 b3 k0_2 in_2
+			simd_mac16_4 b1 k1_2 in_2
+			simd_mac16_4 b2 k2_2 in_2
+
+			inc j 1
+			nop
+			simd_linear d4 b_03 10
+			s64 outptr d4
+		}
+		inc outptr outs
+		inc i 1
+	}
+	$jump_regs end
+}

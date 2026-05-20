@@ -1,0 +1,162 @@
+#include conv1.upinc
+#include dwconv.upinc
+
+@import conv1_36
+@import conv1_36_6
+@import conv1_36_12
+@import conv1_36_whc
+@import dwconv5
+@import layer108_output
+@import layer109_kernel
+@import layer110_kernel
+@import layer111_kernel
+@import layer112_kernel
+@import layer113_kernel
+@import layer117_kernel
+@import layer118_kernel
+@import layer119_kernel
+@import layer120_kernel
+@import layer121_kernel
+@import layer109_bias
+@import layer110_bias
+@import layer111_bias
+@import layer112_bias
+@import layer113_bias
+@import layer117_bias
+@import layer118_bias
+@import layer119_bias
+@import layer120_bias
+@import layer121_bias
+
+.align 16
+group18_a:
+.reserve 1680
+
+group18_b:
+.reserve 840
+
+group18_c:
+.reserve 5040
+
+group18_d:
+.reserve 5040
+
+entry:
+	lc r30,0x09000040
+	sw r30,3
+
+	// 左边
+	lcs dwconv_out_w 10
+	lcs dwconv_out_h 7
+	lcs dwconv_in_w 10
+	lcs dwconv_in_h 7
+	lcs dwconv_c 36
+	lc  dwconv_in_adr layer108_output
+	lc  dwconv_out_adr group18_d
+	lc  dwconv_bias_adr layer109_bias
+	lc  dwconv_kernel_adr layer109_kernel
+	call dwconv5
+
+	lcs conv1_w 10
+	lcs conv1_h 7
+	// 输入36通道, 输出36通道
+	lcs conv1_in_stride 72
+	lcs conv1_out_stride 72
+	lc conv1_in_adr, group18_d
+	lc conv1_out_adr group18_c
+	lc conv1_bias_adr layer110_bias
+	lc conv1_kernel_adr layer110_kernel
+	call conv1_36_whc
+
+	lcs dwconv_out_w 10
+	lcs dwconv_out_h 7
+	lcs dwconv_in_w 10
+	lcs dwconv_in_h 7
+	lcs dwconv_c 36
+	lc  dwconv_in_adr group18_c
+	lc  dwconv_out_adr group18_d
+	lc  dwconv_bias_adr layer111_bias
+	lc  dwconv_kernel_adr layer111_kernel
+	call dwconv5
+
+	lcs conv1_w 10
+	lcs conv1_h 7
+	// 输入36通道, 输出36通道
+	lcs conv1_in_stride 72
+	lcs conv1_out_stride 72
+	lc conv1_in_adr, group18_d
+	lc conv1_out_adr group18_c
+	lc conv1_bias_adr layer112_bias
+	lc conv1_kernel_adr layer112_kernel
+	call conv1_36
+
+	lcs conv1_w 10
+	lcs conv1_h 7
+	// 输入36通道, 输出6通道
+	lcs conv1_in_stride 72
+	lcs conv1_out_stride 12
+	lc conv1_in_adr, group18_c
+	lc conv1_out_adr group18_b
+	lc conv1_bias_adr layer113_bias
+	lc conv1_kernel_adr layer113_kernel
+	call conv1_36_6
+
+	// 右边
+	lcs dwconv_out_w 10
+	lcs dwconv_out_h 7
+	lcs dwconv_in_w 10
+	lcs dwconv_in_h 7
+	lcs dwconv_c 36
+	lc  dwconv_in_adr layer108_output
+	lc  dwconv_out_adr group18_d
+	lc  dwconv_bias_adr layer117_bias
+	lc  dwconv_kernel_adr layer117_kernel
+	call dwconv5
+
+	lcs conv1_w 10
+	lcs conv1_h 7
+	// 输入36通道, 输出36通道
+	lcs conv1_in_stride 72
+	lcs conv1_out_stride 72
+	lc conv1_in_adr, group18_d
+	lc conv1_out_adr group18_c
+	lc conv1_bias_adr layer118_bias
+	lc conv1_kernel_adr layer118_kernel
+	call conv1_36_whc
+
+	lcs dwconv_out_w 10
+	lcs dwconv_out_h 7
+	lcs dwconv_in_w 10
+	lcs dwconv_in_h 7
+	lcs dwconv_c 36
+	lc  dwconv_in_adr group18_c
+	lc  dwconv_out_adr group18_d
+	lc  dwconv_bias_adr layer119_bias
+	lc  dwconv_kernel_adr layer119_kernel
+	call dwconv5
+
+	lcs conv1_w 10
+	lcs conv1_h 7
+	// 输入36通道, 输出36通道
+	lcs conv1_in_stride 72
+	lcs conv1_out_stride 72
+	lc conv1_in_adr, group18_d
+	lc conv1_out_adr group18_c
+	lc conv1_bias_adr layer120_bias
+	lc conv1_kernel_adr layer120_kernel
+	call conv1_36
+
+	lcs conv1_w 10
+	lcs conv1_h 7
+	// 输入36通道, 输出12通道
+	lcs conv1_in_stride 72
+	lcs conv1_out_stride 24
+	lc conv1_in_adr, group18_c
+	lc conv1_out_adr group18_a
+	lc conv1_bias_adr layer121_bias
+	lc conv1_kernel_adr layer121_kernel
+	call conv1_36_12
+	
+	lc r30,0x09000040
+	lw r31,r30
+	hlt

@@ -1,0 +1,225 @@
+#include layer_param.upinc
+#include layer_regs.upinc
+
+#define b_03 s4
+#define b0 s4_0
+#define b1 s4_1
+#define b2 s4_2
+#define b3 s4_3
+
+#define k0_0 s0
+#define k0_1 s1
+#define k1_0 s2
+#define k1_1 s3
+#define k2_0 s5
+#define k2_1 s13
+
+#define in16 s6
+#define in16_p0 s6_01
+#define in16_p1 s6_23
+
+#define in0 s7
+#define in1 s8
+
+#define k0_2 s9
+#define k1_2 s10
+#define k2_2 s11
+#define in2 s12
+#define ktmp s6
+#define kscale s14
+#define kzero_point s15
+
+#define kptr ptr2
+#define bptr ptr3
+
+#define rj0 r20
+#define rj1 r21
+#define i r22
+#define j r23
+#define wxh outwxh
+#define bstart badr
+#define mulshift layer_mulshift
+
+@export conv1_24in_20out_linear_whc
+conv1_24in_20out_linear_whc:
+	simd_ext32 kscale layer_scale
+	simd_ext32 kzero_point layer_zeropt
+	// 设置ptr0偏移值为wxh
+	lc j 0x10000
+	or i wxh j
+	svw 0x09000058, i
+
+	lcs i 0
+	$jump_regs rj0
+	whileu i < wxh {
+		mov inptr inadr
+		mov outptr outadr
+
+		lm_d in16 inptr
+		mov kptr kadr
+		simd_8to16 in0 in16_p0
+		simd_8to16 in1 in16_p1
+
+		lm_d in16 inptr
+		mov bptr bstart
+		simd_8to16 in2 in16_p0
+
+		lcs j 0
+		whileu j < 20 {
+			lm_d  b_03 bptr
+			lm_d  k0_0 kptr
+			lm_d  k0_1 kptr
+			lm_d  k0_2 kptr
+			lm_d  k1_0 kptr
+			lm_d  k1_1 kptr
+			lm_d  k1_2 kptr
+			lm_d  k2_0 kptr
+			lm_d  k2_1 kptr
+			lm_d  k2_2 kptr
+			simd_mac16_8 b0 k0_0 in0
+			lm_d  k0_0 kptr
+			simd_mac16_8 b3 k0_0 in0
+			simd_mac16_8 b1 k1_0 in0
+			simd_mac16_8 b2 k2_0 in0
+
+			simd_mac16_8 b0 k0_1 in1
+			lm_d  k0_1 kptr
+			simd_mac16_8 b3 k0_1 in1
+			simd_mac16_8 b1 k1_1 in1
+			simd_mac16_8 b2 k2_1 in1
+
+			simd_mac16_8 b0 k0_2 in2
+			lm_d  k0_2 kptr
+			simd_mac16_8 b3 k0_2 in2
+			simd_mac16_8 b1 k1_2 in2
+			simd_mac16_8 b2 k2_2 in2
+
+			inc j 4
+			nop
+
+			simd_linear d0 b_03 mulshift
+			simd_16to32 b_03 d0
+			simd_i32f32 b_03 b_03 31
+			simd_fmul b_03 b_03 kscale
+			simd_fsub b_03 b_03 kzero_point
+			simd_f32i32 ktmp b_03 30
+			simd_f32i32 b_03 b_03 31
+			simd_sub32 b_03 ktmp b_03
+
+			nop
+			sbyte outptr b0
+			sbyte outptr b1
+			sbyte outptr b2
+			sbyte outptr b3
+		}
+		inc inadr 24
+		inc outadr 1
+		inc i 1
+	}
+	$jump_regs end
+	// ptr0 偏移值写回0
+	svw 0x09000058 0
+
+	ret
+/*
+#define outptr ptr0
+#define inptr ptr1
+#define kptr ptr2
+#define bptr ptr3
+$func conv1_24in_20out_linear_whc() {
+	reg i, j, wxh, bstart, kadr, outadr, inadr
+	reg rj0, rj1, scale, zero_pt, mulshift
+	reg param_ptr(rj0)
+
+	lc param_ptr, LAYER_PARAM_ADDR
+	lw inadr param_ptr, INPUT_ADDR_OFF
+	lw outadr param_ptr, OUTPUT_ADDR_OFF
+	lw kadr param_ptr, KERNEL_ADDR_OFF
+	lw bstart param_ptr, BIAS_ADDR_OFF
+	lw scale param_ptr, SCALE_OFF
+	lw zero_pt param_ptr, ZERO_POINT_OFF
+	lw mulshift param_ptr, MUL_SHIFT_OFF
+	lw wxh param_ptr, OUTW_OFF
+	lw i param_ptr, OUTH_OFF	
+	muls16 wxh wxh i
+	simd_ext32 kscale scale
+	simd_ext32 kzero_point zero_pt
+
+	// 设置ptr0偏移值为wxh
+	lc j 0x10000
+	or i wxh j
+	svw 0x09000058, i
+
+	lcs i 0
+	$jump_regs rj0
+	whileu i < wxh {
+		mov inptr inadr
+		mov outptr outadr
+
+		lm_d in16 inptr
+		mov kptr kadr
+		simd_8to16 in0 in16_p0
+		simd_8to16 in1 in16_p1
+
+		lm_d in16 inptr
+		mov bptr bstart
+		simd_8to16 in2 in16_p0
+
+		lcs j 0
+		whileu j < 20 {
+			lm_d  b_03 bptr
+			lm_d  k0_0 kptr
+			lm_d  k0_1 kptr
+			lm_d  k0_2 kptr
+			lm_d  k1_0 kptr
+			lm_d  k1_1 kptr
+			lm_d  k1_2 kptr
+			lm_d  k2_0 kptr
+			lm_d  k2_1 kptr
+			lm_d  k2_2 kptr
+			simd_mac16_8 b0 k0_0 in0
+			lm_d  k0_0 kptr
+			simd_mac16_8 b3 k0_0 in0
+			simd_mac16_8 b1 k1_0 in0
+			simd_mac16_8 b2 k2_0 in0
+
+			simd_mac16_8 b0 k0_1 in1
+			lm_d  k0_1 kptr
+			simd_mac16_8 b3 k0_1 in1
+			simd_mac16_8 b1 k1_1 in1
+			simd_mac16_8 b2 k2_1 in1
+
+			simd_mac16_8 b0 k0_2 in2
+			lm_d  k0_2 kptr
+			simd_mac16_8 b3 k0_2 in2
+			simd_mac16_8 b1 k1_2 in2
+			simd_mac16_8 b2 k2_2 in2
+
+			inc j 4
+			nop
+
+			simd_linear d0 b_03 mulshift
+			simd_16to32 b_03 d0
+			simd_i32f32 b_03 b_03 31
+			simd_fmul b_03 b_03 kscale
+			simd_fsub b_03 b_03 kzero_point
+			simd_f32i32 ktmp b_03 30
+			simd_f32i32 b_03 b_03 31
+			simd_sub32 b_03 ktmp b_03
+
+			nop
+			sbyte outptr b0
+			sbyte outptr b1
+			sbyte outptr b2
+			sbyte outptr b3
+		}
+		inc inadr 24
+		inc outadr 1
+		inc i 1
+	}
+	$jump_regs end
+	// ptr0 偏移值写回0
+	svw 0x09000058 0
+	nop
+}
+*/

@@ -1,0 +1,33 @@
+#BUILD-INFO
+TYPE=APP
+NAME=yolo_cmos_2013
+CFG=u31
+ENTRY_NAME=entry
+
+#DEBUG-INFO
+DEBUG_TYPE=IIC
+SIMULATE_DATA=simdata
+I2C_ADDR_BYTE=0x50
+
+#OUTPUT-INFO
+PATH=out
+BIN=true
+HEX=true
+MAP=false
+OBJS=false
+
+#FILES
+[ext]upinc
+[ext]upasm
+
+#EXCLUDE
+[dir]out
+single_frame.upasm
+yolo_cmos_3901.upasm
+
+#MACROS
+#define MEMORY_DATA_SIZE (1024*225)
+#define KERNEL_DATA_SIZE (1024*17)
+
+#GENERATION
+PREFIX=u31_sys

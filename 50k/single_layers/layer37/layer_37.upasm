@@ -1,0 +1,252 @@
+@import layer_37_input
+@import box_count
+@import box_data
+
+#define EXP_K 1477	// log2(e):  1.442695*(2^10)
+#define layerw 47 // 1.0f / 22 => 1024/22
+
+#define i r0
+#define j r1
+#define n r2
+// 一些常量
+#define max_i r3
+#define max_j r4
+#define exp_k r5
+#define max_logact r6
+#define m22p10_1 r7
+#define m22p10_1024 r8
+#define layerh r9
+#define score_thres r10
+#define next_box_reg r11
+
+#define anchor_a r12
+#define anchor_b r13
+#define input_ptr r14
+
+#define box_n r15
+#define box_ptr r16
+
+#define boxx r17
+#define boxy r18
+#define boxw r19
+#define boxh r20
+#define score r21
+#define ignore_box r22
+
+#define logact_v r22
+#define half_w r23
+#define half_h r24
+
+#define anchor_ptr ptr2
+
+//										|换底:2->e,乘完之后是m12p20|转换位m8p24|执行exp2		  |  m16p16 to m22p10			
+#instruction-alias (exp_m22p10 res in) => (muls32 in in exp_k) (sl in in 4) (exp2_m16p16 res in) (srs res res 6)
+
+
+layer_37:
+
+
+
+
+	sv temp_rp rp
+	lcs score_thres 255
+	//lcs layerw 47 // 1.0f / 22 => 1024/22
+	lcs layerh 93 // 1.0f / 11 => 1024/11
+	lcs max_i 11264 // 11*1024
+	lcs max_j 22528 // 22*1024
+	lcs exp_k EXP_K
+	lcs max_logact 7168 // 7.0 in m26p10, e^7=1096.6... > 1024
+	lcs m22p10_1 1024
+	lc m22p10_1024 1048576 // 1024*1024
+	lcs input_ptr layer_37_input
+	lcs box_n 0
+	lcs box_ptr box_data
+	lcs next_box_reg next_box
+
+	lcs logact_v 7169
+	neg logact_v logact_v
+	exp_m22p10 logact_v logact_v
+	inc logact_v m22p10_1
+	divs32 logact_v m22p10_1024 logact_v
+
+
+	$jump_regs r33 ...
+
+	lcs i 0
+	whileu i < max_i {
+		lcs j 0
+		whileu j < max_j {
+
+			lcs n 0
+			lcs anchor_ptr anchors
+			whileu n < 3 {
+				lsl anchor_a anchor_ptr
+				lsl anchor_b anchor_ptr
+
+				// check score
+				lsl logact_v input_ptr 8
+				call logistic_activate
+				cjmpe next_box_reg logact_v 0
+				mov score logact_v
+
+				lsl logact_v input_ptr 10
+				call logistic_activate
+				// 此时logact_v是class_score
+				cjmpe next_box_reg logact_v 0
+				
+				muls16 score score logact_v
+				srs score score 10
+				cjmpsl next_box_reg score score_thres
+				
+				// 计算box的坐标
+				// w/h/x/y
+				lsl boxw input_ptr 4
+				exp_m22p10 boxw boxw
+				muls16 boxw boxw anchor_a
+				srs boxw boxw 10
+
+				lsl boxh input_ptr 6
+				exp_m22p10 boxh boxh
+				muls16 boxh boxh anchor_b
+				sru boxh boxh 10
+
+				srs half_w boxw 1
+				srs half_h boxh 1
+
+				lsl logact_v input_ptr 0
+				call logistic_activate
+				add boxx j logact_v
+				muls16 boxx boxx layerw
+				srs boxx boxx 10
+				sub boxx boxx half_w
+
+				lsl logact_v input_ptr 2
+				call logistic_activate
+				add boxy i logact_v
+				muls16 boxy boxy layerh
+				srs boxy boxy 10
+				sub boxy boxy half_h
+
+				call check_box_nml
+				ifu ignore_box == 0 {
+					// save box
+					ssl box_ptr boxx 0
+					ssl box_ptr boxy 2
+					ssl box_ptr boxw 4
+					ssl box_ptr boxh 6
+					ssl box_ptr score 8
+	
+					inc box_n 1
+					cjmpuge r33 box_n 63
+					//ifu box_count >= 63 {
+					//	break 3
+					//}
+					inc box_ptr 10
+				}
+next_box:
+				inc n 1
+				inc input_ptr 12
+			}
+			inc j m22p10_1
+		}
+		inc i m22p10_1
+	}
+	// 将box个数写入内存
+	sv box_count box_n
+	lv rp temp_rp
+	ret
+
+
+// 1.0f / (1.0f + expf(-x));
+logistic_activate:
+	neg logact_v logact_v // -x
+	ifs logact_v >= max_logact {
+		// -x大于7, 直接返回0
+		mov logact_v 0
+		ret
+	}
+	exp_m22p10 logact_v logact_v
+	inc logact_v m22p10_1
+	divs32 logact_v m22p10_1024 logact_v
+	ret
+
+
+#define box_ptr_1 r23
+#define boxx_1 r24
+#define boxy_1 r25
+#define boxw_1 r26
+#define boxh_1 r27
+
+#define t0 r29
+#define t1 r30
+#define t2 r31
+#define union r31
+#define intersection r32
+
+check_box_nml:
+	mov ignore_box 0
+	lcs box_ptr_1 box_data
+	whileu box_ptr_1 < box_ptr {
+
+		lsl boxx_1  box_ptr_1 0
+		lsl boxy_1  box_ptr_1 2
+		lsl boxw_1  box_ptr_1 4
+		lsl boxh_1  box_ptr_1 6
+
+		add t0 boxx boxw
+		add t1 boxx_1 boxw_1
+		min t1 t0 t1
+		max t0 boxx boxx_1
+		sub t0 t1 t0
+
+		mov intersection 0
+		ifs t0 > 0 {
+			add t1 boxy boxh
+			add t2 boxy_1 boxh_1
+			min t2 t1 t2
+			max t1 boxy boxy_1
+			sub t1 t2 t1
+			ifs t1 > 0 {
+				muls16 intersection t0 t1
+				srs intersection intersection 10
+			}
+		}
+
+		muls16 t0 boxw boxh
+		muls16 t1 boxw_1 boxh_1
+		add union t0 t1
+		srs union union 10
+		sub union union intersection
+
+		// if (intersect_area / union_area > 0.4f) 
+		// intersect_area / union_area > 2 / 5
+		// intersect_area * 5 > union_area * 2
+		muls16 intersection intersection 5
+		sl union union 1
+		ifs intersection > union {
+			// 到这里已经确定2个box重叠了.
+			// 下面就是根据得分判断保留哪一个box了.
+			mov ignore_box 1
+			lsl t0 box_ptr_1 8
+			cjmpsge rp t0 score // if t0 >= score then ret
+			//ifs t0 < score {
+				ssl box_ptr_1 boxx 0
+				ssl box_ptr_1 boxy 2
+				ssl box_ptr_1 boxw 4
+				ssl box_ptr_1 boxh 6
+				ssl box_ptr_1 score 8
+			//}
+			ret
+		}
+
+		inc box_ptr_1 10
+	}
+
+	ret
+
+temp_rp:
+.word 0
+
+anchors:
+.short 47 116 58 151 70 198
+

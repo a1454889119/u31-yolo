@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LocalDebuggerCommandArguments>"..\UpixNetwork\model\HeadShoulder_320x160.network.csv" "..\UpixNetwork\model\HeadShoulder_320x160.weights.txt" "\\192.168.1.57\u31-ai人脸人行\03-开发资料\04-训练验证相关数据\new_datasets\headshoulder_hagrid\images\val" "..\UpixNetwork\model\HeadShoulder_320x160.maxmin.txt" "..\v3_8bit\quant_param_headshoulder.upinc" "HeadShoulder_320x160.bin" "..\v3_8bit\weights_flash_headshoulder.upinc"</LocalDebuggerCommandArguments>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerEnvironment>PATH=D:\3rdparty_x64\bin</LocalDebuggerEnvironment>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LocalDebuggerEnvironment>PATH=D:\3rdparty_x64\bin</LocalDebuggerEnvironment>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerCommandArguments>
+    </LocalDebuggerCommandArguments>
+  </PropertyGroup>
+</Project>

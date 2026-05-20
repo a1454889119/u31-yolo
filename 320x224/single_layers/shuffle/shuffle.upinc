@@ -1,0 +1,13 @@
+
+#define shuffle_w r0
+#define shuffle_h r1
+#define shuffle_input_adr r2
+#define shuffle_output_adr r3
+
+#define shuffle_input_adr_2 r8
+
+
+@import shuffle_8_16
+@import shuffle_24
+@import shuffle_48
+@import shuffle_96

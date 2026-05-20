@@ -1,0 +1,11 @@
+@import MEMORY
+@import MEMORY_P0_END
+@import MEMORY_P1_END
+@import KERNEL_ADDR_P0
+@import KERNEL_ADDR_P0_END
+@import KERNEL_ADDR_P1
+@import KERNEL_ADDR_P1_END
+@import TARGETS_ADDR
+@import LAYER_PARAM_ADDR
+@import TMP_TARGET_ADDR
+@import DEC_RECT_ADDR

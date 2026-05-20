@@ -1,0 +1,113 @@
+//---------------LAYER 36(conv)-------------
+//input:22x11x32
+//output:22x11x18
+//k1s1p0,group=1
+//linear
+// cwh
+#include "layers_common.upinc"
+
+#define in_0 s0
+#define in_1 s1
+#define in_2 s2
+#define in_3 s3
+
+#define k0_0 s4
+#define k0_1 s5
+#define k0_2 s6
+#define k0_3 s7
+
+#define k1_0 s8
+#define k1_1 s9
+#define k1_2 s10
+#define k1_3 s11
+
+#define k2_0 s12
+#define k2_1 s13
+#define k2_2 s14
+#define k2_3 s15
+
+#define b0 r3
+#define b1 r4
+#define b2 r5
+#define input_end r6
+#define input_start r7
+#define bias_ptr r8
+#define i r9
+#define output_start r10
+#define output_ptr r11
+
+#define input_ptr ptr0
+#define kernel_ptr ptr1
+
+@export layer_36
+layer_36:
+	lcs input_end LAYER_36_INPUT_SIZE
+	lc input_start layer_35_output
+	inc input_end input_start
+	lc output_start layer_36_output
+
+	mov kernel_ptr kernel_addr
+	mov bias_ptr bias_addr
+
+
+	mov  output_ptr output_start
+	mov  input_ptr input_start
+	lcs i 0
+	$jump_regs r20 ...
+	// 6轮, 每轮得到3个输出通道
+	whileu i < 6 {
+		lm k0_0 kernel_ptr
+		lm k0_1 kernel_ptr
+		lm k0_2 kernel_ptr
+		lm k0_3 kernel_ptr
+		lm k1_0 kernel_ptr
+		lm k1_1 kernel_ptr
+		lm k1_2 kernel_ptr
+		lm k1_3 kernel_ptr
+		lm k2_0 kernel_ptr
+		lm k2_1 kernel_ptr
+		lm k2_2 kernel_ptr
+		lm k2_3 kernel_ptr
+		mov output_ptr output_start
+		mov input_ptr input_start
+		whileu input_ptr < input_end {
+			lw b0 bias_ptr
+			lw b1 bias_ptr 4
+			lw b2 bias_ptr 8
+
+			lm in_0 input_ptr
+			simd_mac16_8 b0 k0_0 in_0
+			simd_mac16_8 b1 k1_0 in_0
+			simd_mac16_8 b2 k2_0 in_0
+
+			lm in_1 input_ptr
+			simd_mac16_8 b0 k0_1 in_1
+			simd_mac16_8 b1 k1_1 in_1
+			simd_mac16_8 b2 k2_1 in_1
+
+			lm in_2 input_ptr
+			simd_mac16_8 b0 k0_2 in_2
+			simd_mac16_8 b1 k1_2 in_2
+			simd_mac16_8 b2 k2_2 in_2
+
+			lm in_3 input_ptr
+			simd_mac16_8 b0 k0_3 in_3
+			simd_mac16_8 b1 k1_3 in_3
+			simd_mac16_8 b2 k2_3 in_3
+			nop
+
+			linear b0 b0 10
+			linear b1 b1 10
+			linear b2 b2 10
+
+			ssl output_ptr b0
+			ssl output_ptr b1 2
+			ssl output_ptr b2 4
+
+			inc output_ptr 36
+		}
+		inc output_start 6
+		inc bias_ptr 12
+		inc i 1
+	}
+	ret

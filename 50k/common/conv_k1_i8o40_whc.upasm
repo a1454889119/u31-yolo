@@ -1,0 +1,142 @@
+
+
+#define k0 s1
+#define k1 s2
+#define k2 s3
+#define k3 s8
+#define k4 s9
+#define k5 s10
+#define k6 s11
+#define k7 s0
+#define k8 s12
+#define k9 s13
+
+#define in0 s6
+
+#define bres0 s4
+#define bres0_0 s4_0
+#define bres0_1 s4_1
+#define bres0_2 s4_2
+#define bres0_3 s4_3
+#define bres1 s5
+#define bres1_0 s5_0
+#define bres1_1 s5_1
+#define bres1_2 s5_2
+#define bres1_3 s5_3
+#define bres2 r3
+#define bres3 r4
+
+#define wh_x2 r5
+#define wh_x4 r6
+#define wh_x6 r7
+#define wh_x8 r8
+#define wh_x10 r9
+#define wh_x12 r10
+#define wh_x14 r11
+#define wh_x16 r12
+#define wh_x18 r13
+#define wh_x20 r14
+
+#define input_end r15
+#define input_start r16
+#define bias_ptr r17
+#define i r18
+#define output_ptr r19
+#define output_start r20
+
+#define input_ptr ptr0
+#define kernel_ptr ptr1
+
+@export conv_k1_i8o40_params
+conv_k1_i8o40_params:
+.word 0 // wh_x2
+.word 0 // input_adr
+.word 0 // output_adr
+.word 0 // kernel_adr
+.word 0 // bias_adr
+
+@export conv_k1_i8o40_whc
+conv_k1_i8o40_whc:
+	lcs ptr2 conv_k1_i8o40_params
+	nop
+	lw wh_x2 ptr2
+	lw input_ptr ptr2
+	lw output_ptr ptr2
+	lw kernel_ptr ptr2
+	lw bias_ptr ptr2
+
+	sl wh_x4 wh_x2 1
+	sl wh_x8 wh_x2 2
+	sl wh_x16 wh_x2 3
+	add wh_x6 wh_x2 wh_x4
+	add wh_x10 wh_x2 wh_x8
+	add wh_x12 wh_x2 wh_x10
+	add wh_x14 wh_x2 wh_x12
+	add wh_x18 wh_x6 wh_x12
+	add wh_x20 wh_x8 wh_x12
+
+	mov output_start output_ptr
+	mov input_start input_ptr
+	// input_end = input_start + wh*16
+	add input_end input_start wh_x16
+
+	lcs i 0
+	$jump_regs r30 ...
+	// 4轮, 每轮得到10个输出通道
+	whileu i < 4 {
+		lm k0 kernel_ptr
+		lm k1 kernel_ptr
+		lm k2 kernel_ptr
+		lm k3 kernel_ptr
+		lm k4 kernel_ptr
+		lm k5 kernel_ptr
+		lm k6 kernel_ptr
+		lm k7 kernel_ptr
+		lm k8 kernel_ptr
+		lm k9 kernel_ptr
+
+		mov input_ptr input_start
+		mov output_ptr output_start
+		whileu input_ptr < input_end {
+			lm in0 input_ptr
+
+			lm bres0 bias_ptr  0
+			lm bres1 bias_ptr 16
+			lw bres2 bias_ptr 32
+			lw bres3 bias_ptr 36
+
+			simd_mac16_8 bres0_0 k0 in0
+			simd_mac16_8 bres0_1 k1 in0
+			simd_mac16_8 bres0_2 k2 in0
+			simd_mac16_8 bres0_3 k3 in0
+			simd_mac16_8 bres1_0 k4 in0
+			simd_mac16_8 bres1_1 k5 in0
+			simd_mac16_8 bres1_2 k6 in0
+			simd_mac16_8 bres1_3 k7 in0
+			simd_mac16_8 bres2   k8 in0
+			simd_mac16_8 bres3   k9 in0
+
+			simd_leaky d0 bres0 10
+			simd_leaky d1 bres1 10
+			leaky bres2 bres2 10
+			leaky bres3 bres3 10
+
+			ssl output_ptr d0_lo 0
+			ss  output_ptr d0_lo wh_x2
+			ssl output_ptr d0_hi wh_x4
+			ss  output_ptr d0_hi wh_x6
+			ssl output_ptr d1_lo wh_x8
+			ss  output_ptr d1_lo wh_x10
+			ssl output_ptr d1_hi wh_x12
+			ss  output_ptr d1_hi wh_x14
+			ssl output_ptr bres2 wh_x16
+			ssl output_ptr bres3 wh_x18
+
+			inc output_ptr 2
+		}
+		inc output_start wh_x20
+		inc bias_ptr 40
+		inc i 1
+	}
+	$jump_regs end
+	ret

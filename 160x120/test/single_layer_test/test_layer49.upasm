@@ -1,0 +1,9 @@
+@import LAYER_38_OUTPUT
+@import LAYER_49_OUTPUT
+
+
+$func upsample_whc(in input, in output, in w, in h, in c)
+
+entry:
+	upsample_whc(LAYER_38_OUTPUT, LAYER_49_OUTPUT, 20, 15, 24)
+	hlt

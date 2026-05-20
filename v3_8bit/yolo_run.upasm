@@ -1,0 +1,1288 @@
+//#include weights_param.upinc
+#include layer_memory.upinc
+#include layer_param.upinc
+
+#include yolo_funcs.upinc
+#include layer_regs.upinc
+
+#if ENABLE_CHECK_COST
+#define CHECK_COST lvw r0 0x09000040; svw 0x09000040 3; 
+#else
+#define CHECK_COST
+#endif
+
+#define flash_adr r0
+#define ram_adr r1
+#define klen r2
+#define t0 r3
+#define rj0 r4
+
+read_flash:
+	svw 0x09000700, 0x000105b0
+	svw 0x09000704, 0x4800021f
+	svw 0x09000708 flash_adr
+	svw 0x0900070c ram_adr
+	lc t0 0x0b000000
+	or t0 klen t0
+	svw 0x09000710 t0
+	ret
+
+@export yolo_run_part1
+@export yolo_run_part2
+@export yolo_run_part3
+yolo_run_part1:
+	push rp
+	lc flash_adr, LAYER_0_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_0_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_0_WEIGHT_LENGTH
+	call read_flash
+	wait_flash
+
+	// 提前读取第1层权重
+	lc flash_adr, LAYER_1_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_1_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_1_WEIGHT_LENGTH
+	call read_flash	
+	// 第0层参数
+	lc  inadr, IMAGE_TRANS_ADDR
+	lc  outptr, LAYER_0_OUTPUT_CWH
+	lc  kadr, LAYER_0_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_0_WEIGHT_RAM_ADDR + LAYER_0_KERNEL_LENGTH
+	lc  layer_scale, LAYER0_QSCALE
+	lc  layer_padv, 0
+	lcs layer_mulshift, LAYER0_MUL_SHIFT
+	lc  layer_zeropt, LAYER0_QZERO_POINT
+	lcs outwxh, 160*80
+	call conv3s2_1in_8out_cwh
+	wait_flash // 等待第1层权重
+
+	// 提前读取第2层权重
+	lc flash_adr, LAYER_2_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_2_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_2_WEIGHT_LENGTH
+	call read_flash		
+	// 第1层参数
+	lc inptr, LAYER_0_OUTPUT_CWH
+	lc outadr, LAYER_1_OUTPUT_WHC
+	lc kadr, LAYER_1_WEIGHT_RAM_ADDR
+	lc badr, LAYER_1_WEIGHT_RAM_ADDR + LAYER_1_KERNEL_LENGTH
+	lc layer_scale, LAYER1_QSCALE
+	lcs layer_mulshift, LAYER1_MUL_SHIFT
+	lc layer_zeropt, LAYER1_QZERO_POINT
+	call conv1_8in_8out_whc
+	wait_flash // 等待第2层权重
+
+	// 提前读取第3层权重
+	lc flash_adr, LAYER_3_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_3_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_3_WEIGHT_LENGTH
+	call read_flash	
+	// 第2层参数
+	lc  inadr, LAYER_1_OUTPUT_WHC
+	lc  outadr, LAYER_2_OUTPUT_CWH
+	lc  kadr, LAYER_2_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_2_WEIGHT_RAM_ADDR + LAYER_2_KERNEL_LENGTH
+	lc  layer_scale, LAYER2_QSCALE
+	lcs layer_mulshift, LAYER2_MUL_SHIFT
+	lc  layer_zeropt, LAYER2_QZERO_POINT
+	lc  layer_padv, LAYER2_PAD_VALUE
+	lcs outw, 80
+	lcs outh, 40
+	lcs outc 8
+	lcs outwxh, 80*40
+	lcs outstride 8	
+	lcs leakyFlag 0
+	lcs conv_step 2
+	call conv3_gx1_cwh
+	wait_flash
+
+	// 提前读取第4层权重
+	lc flash_adr, LAYER_4_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_4_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_4_WEIGHT_LENGTH
+	call read_flash	
+	// 第3层参数
+	lc  inadr, LAYER_2_OUTPUT_CWH
+	lc  outadr, LAYER_3_OUTPUT_CWH
+	lc  kadr, LAYER_3_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_3_WEIGHT_RAM_ADDR + LAYER_3_KERNEL_LENGTH
+	lc  layer_scale, LAYER3_QSCALE
+	lcs layer_mulshift, LAYER3_MUL_SHIFT
+	lc  layer_zeropt, LAYER3_QZERO_POINT
+	//lcs outstride 24 // 输出对比结果的时候用这一行
+	lcs outstride 48
+	// 执行第3层计算
+	call conv1_8in_24out_cwh
+	wait_flash // 等待第4层权重
+	
+ 	// 提前读取第5层权重
+ 	lc flash_adr, LAYER_5_WEIGHT_FLASH_ADDR
+ 	lc ram_adr, LAYER_5_WEIGHT_RAM_ADDR
+ 	lcs klen, LAYER_5_WEIGHT_LENGTH
+ 	call read_flash	
+ 	// 第4层参数
+	lc  inadr, LAYER_3_OUTPUT_CWH + 12
+	lc  outadr, LAYER_4_OUTPUT_WHC
+	lc  kadr, LAYER_4_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_4_WEIGHT_RAM_ADDR + LAYER_4_KERNEL_LENGTH
+	lc  layer_scale, LAYER4_QSCALE
+	lcs layer_mulshift, LAYER4_MUL_SHIFT
+	lc  layer_zeropt, LAYER4_QZERO_POINT
+	lcs instride 48
+ 	// 执行第4层计算
+ 	call conv1_12in_12out_whc
+ 	wait_flash // 等待第5层权重
+
+	// 提前读取第6层权重
+	lc flash_adr, LAYER_6_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_6_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_6_WEIGHT_LENGTH
+	call read_flash	
+	// 第5层参数
+	lc  inadr, LAYER_4_OUTPUT_WHC
+	lc  outadr, LAYER_5_OUTPUT_CWH
+	lc  kadr, LAYER_5_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_5_WEIGHT_RAM_ADDR + LAYER_5_KERNEL_LENGTH
+	lc  layer_scale, LAYER5_QSCALE
+	lcs layer_mulshift, LAYER5_MUL_SHIFT
+	lc  layer_zeropt, LAYER5_QZERO_POINT
+	lc  layer_padv, LAYER5_PAD_VALUE
+	lcs outc 12
+	lcs outstride 12	
+	lcs leakyFlag 1
+	lcs conv_step 1
+	// 执行第5层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第6层权重
+
+	// 提前读取第7层权重
+	lc flash_adr, LAYER_7_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_7_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_7_WEIGHT_LENGTH
+	call read_flash	
+	// 第6层参数
+	lc  inadr, LAYER_5_OUTPUT_CWH
+	lc  outadr, LAYER_6_OUTPUT_WHC
+	lc  kadr, LAYER_6_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_6_WEIGHT_RAM_ADDR + LAYER_6_KERNEL_LENGTH
+	lc  layer_scale, LAYER6_QSCALE
+	lcs layer_mulshift, LAYER6_MUL_SHIFT
+	lc  layer_zeropt, LAYER6_QZERO_POINT
+	lcs instride 12
+
+	// 执行第6层计算
+	call conv1_12in_12out_whc
+	wait_flash // 等待第7层权重
+
+	// 提前读取第8层权重
+	lc flash_adr, LAYER_8_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_8_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_8_WEIGHT_LENGTH
+	call read_flash	
+	// 第7层参数
+	lc  inadr, LAYER_6_OUTPUT_WHC
+	lc  outadr, LAYER_7_OUTPUT_CWH
+	lc  kadr, LAYER_7_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_7_WEIGHT_RAM_ADDR + LAYER_7_KERNEL_LENGTH
+	lc  layer_scale, LAYER7_QSCALE
+	lcs layer_mulshift, LAYER7_MUL_SHIFT
+	lc  layer_zeropt, LAYER7_QZERO_POINT
+	lc  layer_padv, LAYER7_PAD_VALUE
+	//lcs outstride 12 // 输出对比结果的时候用这一行
+	lcs outstride 48
+	lcs conv_step 1
+	// 执行第7层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第8层权重
+
+	// 提前读取第9层权重
+	lc flash_adr, LAYER_9_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_9_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_9_WEIGHT_LENGTH
+	call read_flash	
+	// 第8层参数
+	lc  inadr, LAYER_7_OUTPUT_CWH
+	lc  outadr, LAYER_8_OUTPUT_WHC
+	lc  kadr, LAYER_8_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_8_WEIGHT_RAM_ADDR + LAYER_8_KERNEL_LENGTH
+	lc  layer_scale, LAYER8_QSCALE
+	lcs layer_mulshift, LAYER8_MUL_SHIFT
+	lc  layer_zeropt, LAYER8_QZERO_POINT
+	lcs instride 48
+	// 执行第8层计算
+	call conv1_12in_12out_whc
+	wait_flash // 等待第7层权重
+
+	// 提前读取第10层权重
+	lc flash_adr, LAYER_10_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_10_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_10_WEIGHT_LENGTH
+	call read_flash	
+	// 第9层参数
+	lc  inadr, LAYER_8_OUTPUT_WHC
+	lc  outadr, LAYER_9_OUTPUT_CWH
+	lc  kadr, LAYER_9_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_9_WEIGHT_RAM_ADDR + LAYER_9_KERNEL_LENGTH
+	lc  layer_scale, LAYER9_QSCALE
+	lcs layer_mulshift, LAYER9_MUL_SHIFT
+	lc  layer_zeropt, LAYER9_QZERO_POINT
+	lc  layer_padv, LAYER9_PAD_VALUE
+	lcs outstride 12
+	lcs conv_step 1
+	// 执行第9层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第10层权重
+
+	// 提前读取第11层权重
+	lc flash_adr, LAYER_11_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_11_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_11_WEIGHT_LENGTH
+	call read_flash	
+	// 第10层参数
+	lc  inadr, LAYER_9_OUTPUT_CWH
+	lc  outadr, LAYER_10_OUTPUT_WHC
+	lc  kadr, LAYER_10_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_10_WEIGHT_RAM_ADDR + LAYER_10_KERNEL_LENGTH
+	lc  layer_scale, LAYER10_QSCALE
+	lcs layer_mulshift, LAYER10_MUL_SHIFT
+	lc  layer_zeropt, LAYER10_QZERO_POINT
+	lcs instride 12
+	// 执行第10层计算
+	call conv1_12in_12out_whc
+	wait_flash // 等待第11层权重
+
+	// 提前读取第12层权重
+	lc flash_adr, LAYER_12_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_12_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_12_WEIGHT_LENGTH
+	call read_flash	
+	// 第11层参数
+	lc  inadr, LAYER_10_OUTPUT_WHC
+	lc  outadr, LAYER_11_OUTPUT_CWH
+	lc  kadr, LAYER_11_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_11_WEIGHT_RAM_ADDR + LAYER_11_KERNEL_LENGTH
+	lc  layer_scale, LAYER11_QSCALE
+	lcs layer_mulshift, LAYER11_MUL_SHIFT
+	lc  layer_zeropt, LAYER11_QZERO_POINT
+	lc  layer_padv, LAYER11_PAD_VALUE
+	//lcs outstride 12 // 输出对比结果的时候用这一行
+	lcs outstride 48
+	lcs conv_step 1
+	// 执行第11层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第12层权重
+
+	// 提前读取第13层权重
+	lc flash_adr, LAYER_13_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_13_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_13_WEIGHT_LENGTH
+	call read_flash	
+	// 第12层参数
+	lc  inadr, LAYER_12_INPUT_CWH
+	lc  outadr, LAYER_12_OUTPUT_WHC
+	lc  kadr, LAYER_12_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_12_WEIGHT_RAM_ADDR + LAYER_12_KERNEL_LENGTH
+	lc  layer_scale, LAYER12_QSCALE
+	lcs layer_mulshift, LAYER12_MUL_SHIFT
+	lc  layer_zeropt, LAYER12_QZERO_POINT
+	lcs nFlag 3
+	lcs saveFlag SAVE_WHC
+	// 执行第12层计算
+	call conv1_48in_8nout
+	wait_flash // 等待第13层权重
+
+	// 提前读取第50层权重(临时读取, 先把12层的结果算到24个通道,节省内存)
+	lc flash_adr, LAYER_50_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_50_TMP_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_50_WEIGHT_LENGTH
+	call read_flash
+	// 第13层参数
+	lc  inadr, 			LAYER_12_OUTPUT_WHC
+	lc  outadr, 		LAYER_13_OUTPUT_CWH
+	lc  kadr, 			LAYER_13_WEIGHT_RAM_ADDR
+	lc  badr, 			LAYER_13_WEIGHT_RAM_ADDR + LAYER_13_KERNEL_LENGTH
+	lc  layer_scale, 	 LAYER13_QSCALE
+	lcs layer_mulshift,  LAYER13_MUL_SHIFT
+	lc  layer_zeropt, 	 LAYER13_QZERO_POINT
+	lc  layer_padv, 	 LAYER13_PAD_VALUE	
+	lcs outw 40
+	lcs outh 20
+	lcs outc 24
+	lcs outwxh, 40*20
+	lcs outstride 24
+	lcs conv_step 2
+	lcs leakyFlag 1
+	// 执行第13层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第50层权重
+
+	// 提前读取第14层权重
+	lc flash_adr, LAYER_14_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_14_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_14_WEIGHT_LENGTH
+	call read_flash	
+	// 第50层参数
+	lc  inadr, 		   LAYER_12_OUTPUT_WHC
+	lc  outadr, 	   LAYER_50_OUTPUT_P1_CWH
+	lc  kadr, 		   LAYER_50_TMP_WEIGHT_RAM_ADDR + (LAYER_50_KERNEL_LENGTH/2)
+	lc  badr, 		   LAYER_50_TMP_WEIGHT_RAM_ADDR + LAYER_50_KERNEL_LENGTH + ((LAYER_50_WEIGHT_LENGTH-LAYER_50_KERNEL_LENGTH)/2)
+	lc  layer_scale, 	LAYER50_QSCALE
+	lcs layer_mulshift, LAYER50_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER50_QZERO_POINT
+	lc  layer_padv, 	LAYER50_PAD_VALUE_C24_48
+	lcs outw 80
+	lcs outh 40
+	lcs outwxh, 80*40
+	lcs outc 12
+	lcs outstride 12
+	lc  outadr2, 	   LAYER_13_OUTPUT_END
+	// 执行第50层计算(前半部分)
+	lcs nFlag 2
+	call conv3_gxn_cwh
+	wait_flash // 等待第14层权重
+
+
+	// 提前读取第15层权重
+	lc flash_adr, LAYER_15_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_15_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_15_WEIGHT_LENGTH
+	call read_flash	
+	// 第14层参数
+	lc  inadr, LAYER_13_OUTPUT_CWH
+	lc  outadr, LAYER_14_OUTPUT_CWH
+	lc  kadr, LAYER_14_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_14_WEIGHT_RAM_ADDR + LAYER_14_KERNEL_LENGTH
+	lc  layer_scale, LAYER14_QSCALE
+	lcs layer_mulshift, LAYER14_MUL_SHIFT
+	lc  layer_zeropt, LAYER14_QZERO_POINT
+	lcs outw 40
+	lcs outh 20
+	lcs outc 24
+	lcs outwxh, 40*20
+	lcs outstride 24
+	lcs instride 24	
+	lcs saveFlag SAVE_CWH
+	// 执行第14层计算
+	call conv1_24inout
+	wait_flash // 等待第15层权重
+
+	// 提前读取第16层权重
+	lc flash_adr, LAYER_16_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_16_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_16_WEIGHT_LENGTH
+	call read_flash	
+	// 第15层参数
+	lc  inadr, LAYER_14_OUTPUT_CWH
+	lc  outadr, LAYER_15_OUTPUT_CWH
+	lc  kadr, LAYER_15_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_15_WEIGHT_RAM_ADDR + LAYER_15_KERNEL_PART_LENGTH
+	lc  layer_scale, LAYER15_QSCALE
+	lcs layer_mulshift, LAYER15_MUL_SHIFT
+	lc  layer_zeropt, LAYER15_QZERO_POINT
+	lcs instride 24	
+	//lcs outstride 48 // 输出对比结果的时候用这一行
+	lcs outstride 120
+	lcs saveFlag SAVE_CWH
+	// 执行第15层计算
+	call conv1_24inout
+	lc  outadr, LAYER_15_OUTPUT_CWH + 24
+	lc  kadr, LAYER_15_WEIGHT_RAM_ADDR + LAYER_15_WEIGHT_PART_LENGTH
+	lc  badr, LAYER_15_WEIGHT_RAM_ADDR + LAYER_15_WEIGHT_PART_LENGTH + LAYER_15_KERNEL_PART_LENGTH
+	lcs instride 24	
+	//lcs outstride 48 // 输出对比结果的时候用这一行
+	lcs outstride 120
+	call conv1_24inout
+	wait_flash // 等待第16层权重
+
+	pop rp
+	ret
+
+yolo_run_part2:
+	push rp
+	// 提前读取第17层权重
+	lc flash_adr, LAYER_17_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_17_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_17_WEIGHT_LENGTH
+	call read_flash	
+	// 第16层参数
+	lc  inadr, LAYER_15_OUTPUT_CWH + 24
+	lc  outadr, LAYER_16_OUTPUT_WHC
+	lc  kadr, LAYER_16_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_16_WEIGHT_RAM_ADDR + LAYER_16_KERNEL_LENGTH
+	lc  layer_scale, LAYER16_QSCALE
+	lcs layer_mulshift, LAYER16_MUL_SHIFT
+	lc  layer_zeropt, LAYER16_QZERO_POINT
+	lcs instride 120	
+	lcs outstride 24
+	lcs saveFlag SAVE_WHC
+	// 执行第16层计算
+	call conv1_24inout
+	wait_flash // 等待第17层权重
+
+	// 提前读取第18层权重
+	lc flash_adr, LAYER_18_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_18_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_18_WEIGHT_LENGTH
+	call read_flash
+	// 第17层参数
+	lc  inadr, LAYER_16_OUTPUT_WHC
+	lc  outadr, LAYER_17_OUTPUT_CWH
+	lc  kadr, LAYER_17_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_17_WEIGHT_RAM_ADDR + LAYER_17_KERNEL_LENGTH
+	lc  layer_scale, LAYER17_QSCALE
+	lcs layer_mulshift, LAYER17_MUL_SHIFT
+	lc  layer_zeropt, LAYER17_QZERO_POINT
+	lc  layer_padv, LAYER17_PAD_VALUE	
+	lcs outstride 24
+	lcs conv_step 1
+	lcs leakyFlag 1
+	// 执行第17层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第18层权重
+
+	// 提前读取第19层权重
+	lc flash_adr, LAYER_19_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_19_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_19_WEIGHT_LENGTH
+	call read_flash
+	// 第18层参数
+	lc  inadr, LAYER_17_OUTPUT_CWH
+	lc  outadr, LAYER_18_OUTPUT_WHC
+	lc  kadr, LAYER_18_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_18_WEIGHT_RAM_ADDR + LAYER_18_KERNEL_LENGTH
+	lc  layer_scale, LAYER18_QSCALE
+	lcs layer_mulshift, LAYER18_MUL_SHIFT
+	lc  layer_zeropt, LAYER18_QZERO_POINT
+	lcs outstride 24
+	lcs instride 24
+	lcs saveFlag SAVE_WHC
+	// 执行第18层计算
+	call conv1_24inout
+	wait_flash // 等待第19层权重
+
+	// 提前读取第20层权重
+	lc flash_adr, LAYER_20_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_20_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_20_WEIGHT_LENGTH
+	call read_flash
+	// 第19层参数
+	lc  inadr, LAYER_18_OUTPUT_WHC
+	lc  outadr, LAYER_19_OUTPUT_CWH
+	lc  kadr, LAYER_19_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_19_WEIGHT_RAM_ADDR + LAYER_19_KERNEL_LENGTH
+	lc  layer_scale, LAYER19_QSCALE
+	lcs layer_mulshift, LAYER19_MUL_SHIFT
+	lc  layer_zeropt, LAYER19_QZERO_POINT
+	lc  layer_padv, LAYER19_PAD_VALUE	
+	lcs outstride 120
+	//lcs outstride 24
+	lcs conv_step 1
+	lcs leakyFlag 1
+	// 执行第19层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第20层权重
+
+	// 提前读取第21层权重
+	lc flash_adr, LAYER_21_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_21_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_21_WEIGHT_LENGTH
+	call read_flash
+	// 第20层参数
+	lc  inadr, LAYER_19_OUTPUT_CWH
+	lc  outadr, LAYER_20_OUTPUT_WHC
+	lc  kadr, LAYER_20_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_20_WEIGHT_RAM_ADDR + LAYER_20_KERNEL_LENGTH
+	lc  layer_scale, LAYER20_QSCALE
+	lcs layer_mulshift, LAYER20_MUL_SHIFT
+	lc  layer_zeropt, LAYER20_QZERO_POINT
+	lcs outstride 24
+	lcs instride 120
+	lcs saveFlag SAVE_WHC
+	// 执行第20层计算
+	call conv1_24inout
+	wait_flash // 等待第21层权重
+
+	// 提前读取第22层权重
+	lc flash_adr, LAYER_22_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_22_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_22_WEIGHT_LENGTH
+	call read_flash
+	// 第21层参数
+	lc  inadr, LAYER_20_OUTPUT_WHC
+	lc  outadr, LAYER_21_OUTPUT_CWH
+	lc  kadr, LAYER_21_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_21_WEIGHT_RAM_ADDR + LAYER_21_KERNEL_LENGTH
+	lc  layer_scale, LAYER21_QSCALE
+	lcs layer_mulshift, LAYER21_MUL_SHIFT
+	lc  layer_zeropt, LAYER21_QZERO_POINT
+	lc  layer_padv, LAYER21_PAD_VALUE	
+	lcs outstride 24
+	lcs conv_step 1
+	lcs leakyFlag 1
+	// 执行第21层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第22层权重
+
+	// 提前读取第23层权重
+	lc flash_adr, LAYER_23_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_23_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_23_WEIGHT_LENGTH
+	call read_flash
+	// 第22层参数
+	lc  inadr, LAYER_21_OUTPUT_CWH
+	lc  outadr, LAYER_22_OUTPUT_WHC
+	lc  kadr, LAYER_22_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_22_WEIGHT_RAM_ADDR + LAYER_22_KERNEL_LENGTH
+	lc  layer_scale, LAYER22_QSCALE
+	lcs layer_mulshift, LAYER22_MUL_SHIFT
+	lc  layer_zeropt, LAYER22_QZERO_POINT
+	lcs outstride 24
+	lcs instride 24
+	lcs saveFlag SAVE_WHC
+	// 执行第22层计算
+	call conv1_24inout
+	wait_flash // 等待第21层权重
+
+	// 提前读取第24层权重
+	lc flash_adr, LAYER_24_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_24_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_24_WEIGHT_LENGTH
+	call read_flash
+	// 第23层参数
+	lc  inadr, LAYER_22_OUTPUT_WHC
+	lc  outadr, LAYER_23_OUTPUT_CWH
+	lc  kadr, LAYER_23_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_23_WEIGHT_RAM_ADDR + LAYER_23_KERNEL_LENGTH
+	lc  layer_scale, LAYER23_QSCALE
+	lcs layer_mulshift, LAYER23_MUL_SHIFT
+	lc  layer_zeropt, LAYER23_QZERO_POINT
+	lc  layer_padv, LAYER23_PAD_VALUE	
+	lcs outstride 120
+	//lcs outstride 24
+	lcs conv_step 1
+	lcs leakyFlag 1
+	// 执行第23层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第23层权重
+
+	// 提前读取第25层权重
+	lc flash_adr, LAYER_25_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_25_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_25_WEIGHT_LENGTH
+	call read_flash
+	// 第24层参数
+	lc  inadr, LAYER_23_OUTPUT_CWH
+	lc  outadr, LAYER_24_OUTPUT_WHC
+	lc  kadr, LAYER_24_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_24_WEIGHT_RAM_ADDR + LAYER_24_KERNEL_LENGTH
+	lc  layer_scale, LAYER24_QSCALE
+	lcs layer_mulshift, LAYER24_MUL_SHIFT
+	lc  layer_zeropt, LAYER24_QZERO_POINT
+	lcs outstride 24
+	lcs instride 120
+	lcs saveFlag SAVE_WHC
+	// 执行第24层计算
+	call conv1_24inout
+	wait_flash // 等待第25层权重
+
+	// 提前读取第26层权重
+	lc flash_adr, LAYER_26_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_26_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_26_WEIGHT_LENGTH
+	call read_flash
+	// 第25层参数
+	lc  inadr, LAYER_24_OUTPUT_WHC
+	lc  outadr, LAYER_25_OUTPUT_CWH
+	lc  kadr, LAYER_25_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_25_WEIGHT_RAM_ADDR + LAYER_25_KERNEL_LENGTH
+	lc  layer_scale, LAYER25_QSCALE
+	lcs layer_mulshift, LAYER25_MUL_SHIFT
+	lc  layer_zeropt, LAYER25_QZERO_POINT
+	lc  layer_padv, LAYER25_PAD_VALUE	
+	lcs outstride 24
+	lcs conv_step 1
+	lcs leakyFlag 1
+	// 执行第25层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第26层权重
+
+	// 提前读取第27层权重
+	lc flash_adr, LAYER_27_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_27_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_27_WEIGHT_LENGTH
+	call read_flash
+	// 第26层参数
+	lc  inadr, LAYER_25_OUTPUT_CWH
+	lc  outadr, LAYER_26_OUTPUT_WHC
+	lc  kadr, LAYER_26_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_26_WEIGHT_RAM_ADDR + LAYER_26_KERNEL_LENGTH
+	lc  layer_scale, LAYER26_QSCALE
+	lcs layer_mulshift, LAYER26_MUL_SHIFT
+	lc  layer_zeropt, LAYER26_QZERO_POINT
+	lcs outstride 24
+	lcs instride 24
+	lcs saveFlag SAVE_WHC
+	// 执行第26层计算
+	call conv1_24inout
+	wait_flash // 等待第27层权重
+
+	// 提前读取第28层权重
+	lc flash_adr, LAYER_28_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_28_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_28_WEIGHT_LENGTH
+	call read_flash
+	// 第27层参数
+	lc  inadr, LAYER_26_OUTPUT_WHC
+	lc  outadr, LAYER_27_OUTPUT_CWH
+	lc  kadr, LAYER_27_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_27_WEIGHT_RAM_ADDR + LAYER_27_KERNEL_LENGTH
+	lc  layer_scale, LAYER27_QSCALE
+	lcs layer_mulshift, LAYER27_MUL_SHIFT
+	lc  layer_zeropt, LAYER27_QZERO_POINT
+	lc  layer_padv, LAYER27_PAD_VALUE	
+	//lcs outstride 24
+	lcs outstride 120
+	lcs conv_step 1
+	lcs leakyFlag 1
+	// 执行第27层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第28层权重
+
+	// 提前读取第29层权重
+	lc flash_adr, LAYER_29_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_29_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_29_WEIGHT_LENGTH
+	call read_flash
+	// 第28层参数
+	lc  inadr, LAYER_28_INPUT_CWH
+	lc  outadr, LAYER_28_OUTPUT_CWH
+	lc  kadr, LAYER_28_WEIGHT_RAM_ADDR
+	lc  badr, LAYER_28_WEIGHT_RAM_ADDR + LAYER_28_KERNEL_LENGTH
+	lc  layer_scale, LAYER28_QSCALE
+	lcs layer_mulshift, LAYER28_MUL_SHIFT
+	lc  layer_zeropt, LAYER28_QZERO_POINT
+	// 执行第28层计算
+	call conv1_120in_48out_cwh
+	wait_flash // 等待第29层权重
+
+	// 30~32为maxpool层,没有权重
+	// 提前读取第33层权重
+	lc flash_adr, LAYER_33_WEIGHT_FLASH_ADDR
+	lc ram_adr, LAYER_33_WEIGHT_RAM_ADDR
+	lcs klen, LAYER_33_WEIGHT_LENGTH
+	call read_flash
+	// 第29层参数
+	lc  inadr, 			LAYER_28_OUTPUT_CWH
+	lc  outadr, 		MAXPOOL_TMP0_WHC
+	lc  outadr2, 		LAYER_29_OUTPUT_CWH
+	lc  kadr, 			LAYER_29_WEIGHT_RAM_ADDR
+	lc  badr, 			LAYER_29_WEIGHT_RAM_ADDR + LAYER_29_KERNEL_LENGTH
+	lc  layer_scale, 	 LAYER29_QSCALE
+	lcs layer_mulshift,  LAYER29_MUL_SHIFT
+	lc  layer_zeropt, 	 LAYER29_QZERO_POINT
+	lcs outstride 96
+	//lcs outstride 24
+	lcs nFlag 3
+	lcs saveFlag SAVE_WHC_CWH
+	// 执行第29层计算
+	call conv1_48in_8nout
+
+	// 30,31,32双输出maxpool
+	lc  inadr, MAXPOOL_TMP0_WHC
+	lc  outadr, LAYER_30_OUTPUT_CWH
+	lc  outadr2, MAXPOOL_TMP1_WHC
+	lcs outstride 96
+	lcs saveFlag SAVE_WHC_CWH
+	call maxpool5_40x20x24
+
+	lc  inadr, MAXPOOL_TMP1_WHC
+	lc  outadr, LAYER_31_OUTPUT_CWH
+	lc  outadr2, MAXPOOL_TMP0_WHC
+	lcs outstride 96
+	lcs saveFlag SAVE_WHC_CWH
+	call maxpool5_40x20x24
+
+	lc  inadr, MAXPOOL_TMP0_WHC
+	lc  outadr, LAYER_32_OUTPUT_CWH
+	lcs outstride 96
+	lcs saveFlag SAVE_CWH
+	call maxpool5_40x20x24
+	wait_flash // 等待第33层权重
+
+	// 提前读取第34层权重
+	lc flash_adr, 	LAYER_34_WEIGHT_FLASH_ADDR
+	lc ram_adr, 	LAYER_34_WEIGHT_RAM_ADDR
+	lcs klen, 		LAYER_34_WEIGHT_LENGTH
+	call read_flash
+	// 第33层参数
+	lc  inadr, 			LAYER_33_INPUT_CWH
+	lc  outadr, 		LAYER_33_OUTPUT_WHC
+	lc  kadr, 			LAYER_33_WEIGHT_RAM_ADDR
+	lc  badr, 			LAYER_33_WEIGHT_RAM_ADDR + LAYER_33_KERNEL_LENGTH
+	lc  layer_scale, 	 LAYER33_QSCALE
+	lcs layer_mulshift,  LAYER33_MUL_SHIFT
+	lc  layer_zeropt, 	 LAYER33_QZERO_POINT
+	// 执行第33层计算
+	call conv1_96in_48out_whc
+	wait_flash // 等待第34层权重
+
+
+	// 提前读取第34层权重
+	lc flash_adr, 		LAYER_35_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_35_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_35_WEIGHT_LENGTH
+	call read_flash
+	// 第34层参数
+	lc  inadr, 		   LAYER_33_OUTPUT_WHC
+	lc  outadr, 	   LAYER_34_OUTPUT_CWH
+	lc  kadr, 		   LAYER_34_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_34_WEIGHT_RAM_ADDR + LAYER_34_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER34_QSCALE
+	lcs layer_mulshift, LAYER34_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER34_QZERO_POINT
+	lc  layer_padv, 	LAYER34_PAD_VALUE
+	lcs outstride 24
+	lc  outadr2, 	   LAYER_34_OUTPUT_END
+	// 执行第34层计算
+	lcs nFlag 2
+	call conv3_gxn_cwh
+	wait_flash // 等待第35层权重
+
+
+	// 36层没有权重, 提前读取第37层权重
+	lc flash_adr, 		LAYER_37_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_37_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_37_WEIGHT_LENGTH
+	call read_flash
+	// 第35层参数
+	lc  inadr, 		   LAYER_34_OUTPUT_CWH
+	lc  outadr, 	   LAYER_35_OUTPUT_WHC
+	lc  kadr, 		   LAYER_35_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_35_WEIGHT_RAM_ADDR + LAYER_35_KERNEL_LENGTH
+	lcs layer_mulshift, LAYER35_MUL_SHIFT
+	lcs instride 24
+	lcs saveFlag SAVE_WHC_16BIT
+	// 执行第35层计算
+	call conv1_24inout
+	// 执行第36层计算
+	lc  inadr, 		   LAYER_35_OUTPUT_WHC
+	lc  outadr, 	   LAYER_36_OUTPUT_CWH
+	lcs sizeFlag SIZE_40X20X24
+	call global_avg
+	wait_flash // 等待第37层权重
+
+	// 38层没有权重, 提前读取第39层权重
+	lc flash_adr, 		LAYER_39_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_39_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_39_WEIGHT_LENGTH
+	call read_flash
+	// 第37层参数
+	lc  inadr, 		   LAYER_36_OUTPUT_CWH
+	lc  outadr, 	   LAYER_37_OUTPUT_CWH
+	lc  kadr, 		   LAYER_37_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_37_WEIGHT_RAM_ADDR + LAYER_37_KERNEL_LENGTH
+	lcs layer_mulshift, LAYER37_MUL_SHIFT
+	// 执行第37层计算
+	call conv1_24inout_sigmoid
+
+	// 第38层参数
+	lc  inadr, 		   LAYER_35_OUTPUT_WHC
+	lc  inadr2,		   LAYER_37_OUTPUT_CWH
+	lc  outadr, 	   LAYER_38_OUTPUT_WHC
+	lc  layer_scale, 	LAYER38_QSCALE
+	lcs layer_mulshift, LAYER38_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER38_QZERO_POINT
+	lcs sizeFlag SIZE_40X20X24
+	// 执行第38层计算
+	call mul_whc
+	wait_flash // 等待第39层权重
+
+	// 提前读取第40层权重
+	lc flash_adr, 		LAYER_40_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_40_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_40_WEIGHT_LENGTH
+	call read_flash
+	// 第39层参数
+	lc  inadr, 		   LAYER_38_OUTPUT_WHC
+	lc  outadr, 	   LAYER_39_OUTPUT_CWH
+	lc  kadr, 		   LAYER_39_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_39_WEIGHT_RAM_ADDR + LAYER_39_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER39_QSCALE
+	lcs layer_mulshift, LAYER39_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER39_QZERO_POINT
+	lc  layer_padv, 	LAYER39_PAD_VALUE
+	lcs outstride 24
+	lcs leakyFlag 1
+	lcs conv_step 1	
+	// 执行第39层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第40层权重
+
+	pop rp
+	ret
+
+yolo_run_part3:
+	push rp
+
+	// 提前读取第41层权重
+	lc flash_adr, 		LAYER_41_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_41_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_41_WEIGHT_LENGTH
+	call read_flash
+	// 第40层参数
+	lc  inadr, 		   LAYER_39_OUTPUT_CWH
+	lc  outadr, 	   LAYER_40_OUTPUT_WHC
+	lc  kadr, 		   LAYER_40_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_40_WEIGHT_RAM_ADDR + LAYER_40_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER40_QSCALE
+	lcs layer_mulshift, LAYER40_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER40_QZERO_POINT
+	// 执行第40层计算
+	call conv1_24in_20out_linear_whc
+	wait_flash // 等待第41层权重
+
+	// 提前读取第42层权重
+	lc flash_adr, 		LAYER_42_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_42_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_42_WEIGHT_LENGTH
+	call read_flash
+	// 第41层参数
+	lc  inadr, 		   LAYER_40_OUTPUT_WHC
+	lc  outadr, 	   LAYER_41_OUTPUT_CWH
+	lc  kadr, 		   LAYER_41_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_41_WEIGHT_RAM_ADDR + LAYER_41_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER41_QSCALE
+	lcs layer_mulshift, LAYER41_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER41_QZERO_POINT
+	lc  layer_padv, 	LAYER41_PAD_VALUE
+	lcs outstride 20
+	lcs outc 20
+	lcs leakyFlag 1
+	lcs conv_step 1	
+	// 执行第41层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第42层权重
+
+	// 提前读取第43层权重
+	lc flash_adr, 		LAYER_43_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_43_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_43_WEIGHT_LENGTH
+	call read_flash
+	// 第42层参数
+	lc  inadr, 		   LAYER_41_OUTPUT_CWH
+	lc  outadr, 	   LAYER_42_OUTPUT_CWH
+	lc  kadr, 		   LAYER_42_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_42_WEIGHT_RAM_ADDR + LAYER_42_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER42_QSCALE
+	lcs layer_mulshift, LAYER42_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER42_QZERO_POINT
+	// 执行第42层计算
+	call conv1_20in_20out_linear_cwh
+	wait_flash // 等待第43层权重
+
+	// 目标个数置零
+	lc t0, TARGETS_ADDR
+	sw t0 0
+
+	// 提前读取第44层权重
+	lc flash_adr, 		LAYER_44_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_44_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_44_WEIGHT_LENGTH
+	call read_flash
+	// 第43层参数
+	lc  inadr, 		   LAYER_42_OUTPUT_CWH
+	lc  outadr, 	   LAYER_43_OUTPUT_CWH
+	lc  kadr, 		   LAYER_43_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_43_WEIGHT_RAM_ADDR + LAYER_43_KERNEL_LENGTH
+	lcs layer_mulshift, LAYER43_MUL_SHIFT
+	// 执行第43层计算
+	call calc_scores
+	wait_flash // 等待第44层权重
+
+	//------------------------------------------------------------------------------
+	// 如果tmp target为0, 跳过44~48层	
+	lc t0, TMP_TARGET_ADDR
+	lw t0 t0
+	lc rj0 wait_layer50
+	cjmpe rj0 t0 0
+
+	// 提前读取第45层权重
+	lc flash_adr, 		LAYER_45_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_45_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_45_WEIGHT_LENGTH
+	call read_flash
+	// 第44层参数
+	lc  inadr, 		   LAYER_38_OUTPUT_WHC
+	lc  outadr, 	   LAYER_44_OUTPUT_CWH
+	lc  kadr, 		   LAYER_44_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_44_WEIGHT_RAM_ADDR + LAYER_44_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER44_QSCALE
+	lcs layer_mulshift, LAYER44_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER44_QZERO_POINT
+	lc  layer_padv, 	LAYER44_PAD_VALUE
+	lcs outc 24
+	lcs outstride 24
+	lcs leakyFlag 1
+	lcs conv_step 1	
+	// 执行第44层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第45层权重
+
+	// 提前读取第46层权重
+	lc flash_adr, 		LAYER_46_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_46_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_46_WEIGHT_LENGTH
+	call read_flash
+	// 第45层参数
+	lc  inadr, 		   LAYER_44_OUTPUT_CWH
+	lc  outadr, 	   LAYER_45_OUTPUT_WHC
+	lc  kadr, 		   LAYER_45_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_45_WEIGHT_RAM_ADDR + LAYER_45_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER45_QSCALE
+	lcs layer_mulshift, LAYER45_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER45_QZERO_POINT
+	// 执行第45层计算
+	call conv1_24in_20out_linear_whc
+	wait_flash // 等待第46层权重
+
+	// 提前读取第47层权重
+	lc flash_adr, 		LAYER_47_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_47_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_47_WEIGHT_LENGTH
+	call read_flash
+	// 第46层参数
+	lc  inadr, 		   LAYER_45_OUTPUT_WHC
+	lc  outadr, 	   LAYER_46_OUTPUT_CWH
+	lc  kadr, 		   LAYER_46_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_46_WEIGHT_RAM_ADDR + LAYER_46_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER46_QSCALE
+	lcs layer_mulshift, LAYER46_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER46_QZERO_POINT
+	lc  layer_padv, 	LAYER46_PAD_VALUE
+	lcs outc 20
+	lcs outstride 20
+	lcs leakyFlag 1
+	lcs conv_step 1	
+	// 执行第46层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第47层权重
+
+	// 提前读取第48层权重
+	lc flash_adr, 		LAYER_48_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_48_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_48_WEIGHT_LENGTH
+	call read_flash
+	// 第47层参数
+	lc  inadr, 		   LAYER_46_OUTPUT_CWH
+	lc  outadr, 	   LAYER_47_OUTPUT_CWH
+	lc  kadr, 		   LAYER_47_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_47_WEIGHT_RAM_ADDR + LAYER_47_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER47_QSCALE
+	lcs layer_mulshift, LAYER47_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER47_QZERO_POINT
+	// 执行第47层计算
+	call conv1_20in_20out_linear_cwh
+	wait_flash // 等待第68层权重
+
+	// 49层没有权重, 提前读取第50层权重
+	lc flash_adr, 		LAYER_50_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_50_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_50_WEIGHT_LENGTH
+	call read_flash	
+	// 第48层参数
+	lc  inadr, 		   LAYER_47_OUTPUT_CWH
+	lc  kadr, 		   LAYER_48_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_48_WEIGHT_RAM_ADDR + LAYER_48_KERNEL_LENGTH
+	lcs layer_scale, 8
+	lcs layer_mulshift, LAYER48_MUL_SHIFT
+	// 执行第48层计算
+	call conv1_20in_40out_linear_cwh
+	jmp run_layer_49
+
+wait_layer50:
+	// 49层没有权重, 提前读取第50层权重
+	lc flash_adr, 		LAYER_50_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_50_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_50_WEIGHT_LENGTH
+	call read_flash	
+run_layer_49:
+
+	// 第49层参数
+	lc inadr,  			LAYER_38_OUTPUT_WHC	
+	lc outadr, 			LAYER_49_OUTPUT_WHC
+	lc sizeFlag SIZE_40X20X24
+	// 执行第49层计算
+	call upsample_whc
+	wait_flash // 等待第50层权重
+
+
+	// 提前读取第51层权重
+	lc flash_adr, 	LAYER_51_WEIGHT_FLASH_ADDR
+	lc ram_adr, 	LAYER_51_WEIGHT_RAM_ADDR
+	lcs klen, 		LAYER_51_WEIGHT_LENGTH
+	call read_flash
+	// 第50层参数
+	lc  inadr, 		   LAYER_49_OUTPUT_WHC
+	lc  outadr, 	   LAYER_50_OUTPUT_P0_CWH
+	lc  kadr, 		   LAYER_50_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_50_WEIGHT_RAM_ADDR + LAYER_50_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER50_QSCALE
+	lcs layer_mulshift, LAYER50_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER50_QZERO_POINT
+	lc  layer_padv, 	LAYER50_PAD_VALUE_C0_24
+	lc  outadr2, 	   LAYER_50_OUTPUT_P0_END
+	lcs outw 80
+	lcs outh 40
+	lcs outwxh, 80*40
+	lcs outc 12
+	lcs outstride 12
+	lcs nFlag 2
+	// 执行第50层计算(P0)
+	call conv3_gxn_cwh
+	wait_flash // 等待第51层权重
+
+
+	// 提前读取第53层权重
+	lc flash_adr, 	LAYER_53_WEIGHT_FLASH_ADDR
+	lc ram_adr, 	LAYER_53_WEIGHT_RAM_ADDR
+	lcs klen, 		LAYER_53_WEIGHT_LENGTH
+	call read_flash
+	// 第71层参数
+	lc  inadr, 		   LAYER_50_OUTPUT_P0_CWH
+	lc  inadr2, 	   LAYER_50_OUTPUT_P1_CWH
+	lc  outadr, 	   LAYER_51_OUTPUT_WHC
+	lc  kadr, 		   LAYER_51_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_51_WEIGHT_RAM_ADDR + LAYER_51_KERNEL_LENGTH
+	lcs layer_mulshift, LAYER51_MUL_SHIFT
+	lcs instride 24
+	lcs outstride 48
+	lcs saveFlag SAVE_WHC_16BIT
+	// 执行第51层计算
+	call conv1_24inout_2parts_in_whc16bit_out
+	wait_flash // 等待第53层权重
+
+	// 执行第52层计算
+	lc  inadr, 		   LAYER_51_OUTPUT_WHC
+	lc  outadr, 	   LAYER_52_OUTPUT_CWH
+	lcs sizeFlag SIZE_80X40X24
+	call global_avg
+
+	// 第53层参数
+	lc  inadr, 		   	LAYER_52_OUTPUT_CWH
+	lc  outadr, 	   	LAYER_53_OUTPUT_CWH
+	lc  kadr, 		   	LAYER_53_WEIGHT_RAM_ADDR
+	lc  badr, 		   	LAYER_53_WEIGHT_RAM_ADDR + LAYER_53_KERNEL_LENGTH
+	lcs layer_mulshift,  LAYER53_MUL_SHIFT
+	// 执行第53层计算
+	call conv1_24inout_sigmoid
+
+	// 提前读取第55层权重
+	lc flash_adr, 	LAYER_55_WEIGHT_FLASH_ADDR
+	lc ram_adr, 	LAYER_55_WEIGHT_RAM_ADDR
+	lcs klen, 		LAYER_55_WEIGHT_LENGTH
+	call read_flash
+
+	lc  inadr, 		   LAYER_51_OUTPUT_WHC
+	lc  inadr2,		   LAYER_53_OUTPUT_CWH
+	lc  outadr, 	   LAYER_54_OUTPUT_WHC
+	lc  layer_scale, 	LAYER54_QSCALE
+	lcs layer_mulshift, LAYER54_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER54_QZERO_POINT
+	lcs sizeFlag SIZE_80X40X24
+	// 执行第54层计算
+	call mul_whc
+	wait_flash // 等待第55层权重
+
+	// 提前读取第56层权重
+	lc flash_adr, 		LAYER_56_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_56_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_56_WEIGHT_LENGTH
+	call read_flash
+	// 第55层参数
+	lc  inadr, 		   LAYER_54_OUTPUT_WHC
+	lc  outadr, 	   LAYER_55_OUTPUT_CWH
+	lc  kadr, 		   LAYER_55_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_55_WEIGHT_RAM_ADDR + LAYER_55_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER55_QSCALE
+	lcs layer_mulshift, LAYER55_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER55_QZERO_POINT
+	lc  layer_padv, 	LAYER55_PAD_VALUE
+	lcs outstride 24
+	lcs outc 24
+	lcs leakyFlag 1
+	lcs conv_step 1	
+	// 执行第55层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第56层权重
+
+	// 提前读取第57层权重
+	lc flash_adr, 		LAYER_57_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_57_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_57_WEIGHT_LENGTH
+	call read_flash
+	// 第56层参数
+	lc  inadr, 		   LAYER_55_OUTPUT_CWH
+	lc  outadr, 	   LAYER_56_OUTPUT_WHC
+	lc  kadr, 		   LAYER_56_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_56_WEIGHT_RAM_ADDR + LAYER_56_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER56_QSCALE
+	lcs layer_mulshift, LAYER56_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER56_QZERO_POINT
+	// 执行第56层计算
+	call conv1_24in_20out_linear_whc
+	wait_flash // 等待第57层权重
+
+	// 提前读取第58层权重
+	lc flash_adr, 		LAYER_58_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_58_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_58_WEIGHT_LENGTH
+	call read_flash
+	// 第57层参数
+	lc  inadr, 		   LAYER_56_OUTPUT_WHC
+	lc  outadr, 	   LAYER_57_OUTPUT_CWH
+	lc  kadr, 		   LAYER_57_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_57_WEIGHT_RAM_ADDR + LAYER_57_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER57_QSCALE
+	lcs layer_mulshift, LAYER57_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER57_QZERO_POINT
+	lc  layer_padv, 	LAYER57_PAD_VALUE
+	lcs outstride 20
+	lcs outc 20
+	lcs leakyFlag 1
+	lcs conv_step 1	
+	// 执行第57层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第58层权重
+
+	// 提前读取第59层权重
+	lc flash_adr, 		LAYER_59_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_59_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_59_WEIGHT_LENGTH
+	call read_flash
+	// 第58层参数
+	lc  inadr, 		   LAYER_57_OUTPUT_CWH
+	lc  outadr, 	   LAYER_58_OUTPUT_CWH
+	lc  kadr, 		   LAYER_58_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_58_WEIGHT_RAM_ADDR + LAYER_58_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER58_QSCALE
+	lcs layer_mulshift, LAYER58_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER58_QZERO_POINT
+	// 执行第58层计算
+	call conv1_20in_20out_linear_cwh
+	wait_flash // 等待第59层权重
+
+
+
+	// 提前读取第60层权重
+	lc flash_adr, 		LAYER_60_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_60_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_60_WEIGHT_LENGTH
+	call read_flash
+	// 第59层参数
+	lc  inadr, 		   LAYER_58_OUTPUT_CWH
+	lc  outadr, 	   LAYER_59_OUTPUT_CWH
+	lc  kadr, 		   LAYER_59_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_59_WEIGHT_RAM_ADDR + LAYER_59_KERNEL_LENGTH
+	lcs layer_mulshift, LAYER59_MUL_SHIFT
+	// 执行第59层计算
+	call calc_scores
+	wait_flash // 等待第60层权重
+
+	//------------------------------------------------------------------------------
+	// 如果tmp target为0, 跳过61~64层	
+	lc t0, TMP_TARGET_ADDR
+	lw t0 t0
+	lc rj0 all_layers_end
+	cjmpe rj0 t0 0
+
+	// 提前读取第61层权重
+	lc flash_adr, 		LAYER_61_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_61_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_61_WEIGHT_LENGTH
+	call read_flash
+	// 第60层参数
+	lc  inadr, 		   LAYER_54_OUTPUT_WHC
+	lc  outadr, 	   LAYER_60_OUTPUT_CWH
+	lc  kadr, 		   LAYER_60_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_60_WEIGHT_RAM_ADDR + LAYER_60_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER60_QSCALE
+	lcs layer_mulshift, LAYER60_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER60_QZERO_POINT
+	lc  layer_padv, 	LAYER60_PAD_VALUE
+	lcs outc 24
+	lcs outstride 24
+	lcs leakyFlag 1
+	lcs conv_step 1	
+	// 执行第60层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第61层权重
+
+	// 提前读取第62层权重
+	lc flash_adr, 		LAYER_62_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_62_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_62_WEIGHT_LENGTH
+	call read_flash
+	// 第61层参数
+	lc  inadr, 		   LAYER_60_OUTPUT_CWH
+	lc  outadr, 	   LAYER_61_OUTPUT_WHC
+	lc  kadr, 		   LAYER_61_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_61_WEIGHT_RAM_ADDR + LAYER_61_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER61_QSCALE
+	lcs layer_mulshift, LAYER61_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER61_QZERO_POINT
+	// 执行第61层计算
+	call conv1_24in_20out_linear_whc
+	wait_flash // 等待第62层权重
+
+	// 提前读取第63层权重
+	lc flash_adr, 		LAYER_63_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_63_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_63_WEIGHT_LENGTH
+	call read_flash
+	// 第62层参数
+	lc  inadr, 		   LAYER_61_OUTPUT_WHC
+	lc  outadr, 	   LAYER_62_OUTPUT_CWH
+	lc  kadr, 		   LAYER_62_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_62_WEIGHT_RAM_ADDR + LAYER_62_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER62_QSCALE
+	lcs layer_mulshift, LAYER62_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER62_QZERO_POINT
+	lc  layer_padv, 	LAYER62_PAD_VALUE
+	lcs outc 20
+	lcs outstride 20
+	lcs leakyFlag 1
+	lcs conv_step 1	
+	// 执行第62层计算
+	call conv3_gx1_cwh
+	wait_flash // 等待第63层权重
+
+	// 提前读取第64层权重
+	lc flash_adr, 		LAYER_64_WEIGHT_FLASH_ADDR
+	lc ram_adr, 		LAYER_64_WEIGHT_RAM_ADDR
+	lcs klen, 			LAYER_64_WEIGHT_LENGTH
+	call read_flash
+	// 第63层参数
+	lc  inadr, 		   LAYER_62_OUTPUT_CWH
+	lc  outadr, 	   LAYER_63_OUTPUT_CWH
+	lc  kadr, 		   LAYER_63_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_63_WEIGHT_RAM_ADDR + LAYER_63_KERNEL_LENGTH
+	lc  layer_scale, 	LAYER63_QSCALE
+	lcs layer_mulshift, LAYER63_MUL_SHIFT
+	lc  layer_zeropt, 	LAYER63_QZERO_POINT
+	// 执行第63层计算
+	call conv1_20in_20out_linear_cwh
+	wait_flash // 等待第63层权重
+
+	// 第64层参数
+	lc  inadr, 		   LAYER_63_OUTPUT_CWH
+	lc  kadr, 		   LAYER_64_WEIGHT_RAM_ADDR
+	lc  badr, 		   LAYER_64_WEIGHT_RAM_ADDR + LAYER_64_KERNEL_LENGTH
+	lcs layer_scale, 4
+	lcs layer_mulshift, LAYER64_MUL_SHIFT
+	// 执行第64层计算
+	call conv1_20in_40out_linear_cwh
+
+all_layers_end:
+
+	pop rp
+	ret

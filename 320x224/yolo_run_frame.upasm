@@ -1,0 +1,134 @@
+#include layer0.upinc
+#include memory_layout.upinc
+#include yolo_layer.upinc
+
+@import group0
+@import group1
+@import group2
+@import group3
+@import group4
+@import group5
+@import group6
+@import group7
+@import group8
+@import group9
+@import group10
+@import group11
+@import group12
+@import group13
+@import group14
+@import group15
+@import group16
+@import group17
+@import group18
+@import group19
+
+yolo_rp:
+.word 0
+
+
+
+@export yolo_run_frame
+yolo_run_frame:
+	svw yolo_rp rp
+
+	// -----------------------STAGE 0-------------------------
+	// 从PSRAM读取stage0的参数
+	svw 0x09000608, STAGE_0_PARAM_PSRAM_ADDR
+	svw 0x0900060c, STAGE_0_PARAM_RAM_ADDR
+	svw 0x09000610, STAGE_0_PARAM_SIZE
+	sv 0x09000620 1
+
+	lc layer0_kernel_adr, LAYER_0_KERNEL_ADDR
+	lc layer0_bias_adr, LAYER_0_BIAS_ADDR
+	lcs layer0_tmp_adr, IO_ADR
+
+	call layer0_prepare
+	wait_psram
+	call layer0
+
+	call group0
+	call group1
+	call group2
+
+	// -----------------------STAGE 1-------------------------
+	// 从PSRAM读取stage1的参数
+	svw 0x09000608, STAGE_1_PARAM_PSRAM_ADDR
+	svw 0x0900060c, STAGE_1_PARAM_RAM_ADDR
+	svw 0x09000610, STAGE_1_PARAM_SIZE
+	sv 0x09000620 1
+
+	wait_psram
+
+	call group3
+	call group4
+	call group5
+	
+	// -----------------------STAGE 2-------------------------
+	// 从PSRAM读取stage2的参数
+	svw 0x09000608, STAGE_2_PARAM_PSRAM_ADDR
+	svw 0x0900060c, STAGE_2_PARAM_RAM_ADDR
+	svw 0x09000610, STAGE_2_PARAM_SIZE
+	sv 0x09000620 1
+
+	wait_psram
+	call group6
+	call group7
+	call group8
+	call group9
+	call group10
+	call group11
+	call group12
+
+#var PSRAM_WRITE_CODE 0
+#set_bits PSRAM_WRITE_CODE 31 24 0x80 	// [31:24]  spi_cmd       //SPI指令码, 写0x09000610启动一次读、写  
+#set_bits PSRAM_WRITE_CODE 23 23 1 		// [23]     spi_wr        //1:write, 0:read  
+
+	// SUBNET_A_20X14_ADDR_B(26880写入PSRAM)
+	svw 0x09000608, PSRAM_GROUP12_B_ADR
+	svw 0x0900060c, SUBNET_A_20X14_ADDR_B
+	lc r0 PSRAM_WRITE_CODE
+	lcs r1 26880
+	or r0 r0 r1
+	sv 0x09000610, r0
+	sv 0x09000620 1
+
+	call group13
+	wait_psram // 等待group12向PSRAM 写入的数据
+
+	// -----------------------STAGE 3-------------------------
+	// 从PSRAM读取stage3的参数	
+	svw 0x09000608, STAGE_3_PARAM_PSRAM_ADDR
+	svw 0x0900060c, STAGE_3_PARAM_RAM_ADDR
+	svw 0x09000610, STAGE_3_PARAM_SIZE
+	sv 0x09000620 1
+	wait_psram
+
+	call group14
+	call group15
+	call group16
+
+	// GROUP17_B(从PSRAM读取26880) 
+	svw 0x09000608, PSRAM_GROUP12_B_ADR
+	svw 0x0900060c, SUBNET_A_20X14_ADDR_B
+	svw 0x09000610, 26880
+	sv 0x09000620 1
+	wait_psram
+
+	call group17
+	call group18
+	call group19
+	
+	// -----------------------结果框解析-------------------------
+	call yolo_layer_init
+
+	lc r1, SUBNET_C_20X14_ADDR_B
+	lc r2, SUBNET_C_20X14_ADDR_A
+	yolo_layer_update(r1, r2, 20, 14)
+
+	lc r1, SUBNET_C_10X7_ADDR_B
+	lc r2, SUBNET_C_10X7_ADDR_A
+	yolo_layer_update(r1, r2, 10, 7)
+
+	lvw rp yolo_rp
+	ret

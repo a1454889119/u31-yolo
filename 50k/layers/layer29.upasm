@@ -1,0 +1,118 @@
+//---------------LAYER 29(conv)-------------
+//input:22x11x8
+//output:22x11x24
+//k1s1p0,group=1
+//leaky
+// 输出cwh, 不能用conv_k1_i8o24_whc
+#include "layers_common.upinc"
+
+#define k0 s1
+#define k1 s2
+#define k2 s3
+#define k3 s8
+#define k4 s9
+#define k5 s10
+#define k6 s11
+#define k7 s0
+#define k8 s12
+#define k9 s13
+#define k10 s14
+#define k11 s15
+
+#define in0 s6
+
+#define br0 s4
+#define br1 s5
+#define br0_0 s4_0
+#define br0_1 s4_1
+#define br0_2 s4_2
+#define br0_3 s4_3
+#define br1_0 s5_0
+#define br1_1 s5_1
+#define br1_2 s5_2
+#define br1_3 s5_3
+
+#define input_ptr ptr0
+#define kernel_ptr ptr1
+
+#define input_end r3
+#define input_start r4
+#define bias_ptr r5
+#define i r6
+#define output_ptr r7
+#define output_start r8
+#define output_stride r9
+
+@export layer_29
+layer_29:
+
+	lc input_start layer_28_output
+	lcs t0 LAYER_28_OUTPUT_SIZE
+	add input_end input_start t0
+
+	lc output_start layer_29_output
+	inc output_start 48
+	lcs output_stride 96
+
+	mov bias_ptr bias_addr
+	mov kernel_ptr kernel_addr
+
+	lcs i 0
+	$jump_regs r20 r21 ...
+	// 2轮, 每轮得到12个输出通道
+	whileu i < 2 {
+		lm k0  kernel_ptr
+		lm k1  kernel_ptr
+		lm k2  kernel_ptr
+		lm k3  kernel_ptr
+		lm k4  kernel_ptr
+		lm k5  kernel_ptr
+		lm k6  kernel_ptr
+		lm k7  kernel_ptr
+		lm k8  kernel_ptr
+		lm k9  kernel_ptr
+		lm k10 kernel_ptr
+		lm k11 kernel_ptr
+
+		mov input_ptr input_start
+		mov output_ptr output_start
+		whileu input_ptr < input_end {
+			lm in0 input_ptr
+
+			lm br0 bias_ptr
+			lm br1 bias_ptr 16
+
+			simd_mac16_8 br0_0 k0 in0
+			simd_mac16_8 br0_1 k1 in0
+			simd_mac16_8 br0_2 k2 in0
+			simd_mac16_8 br0_3 k3 in0
+			simd_mac16_8 br1_0 k4 in0
+			simd_mac16_8 br1_1 k5 in0
+			simd_mac16_8 br1_2 k6 in0
+			simd_mac16_8 br1_3 k7 in0
+
+
+			simd_leaky d0 br0 10
+			lm br0 bias_ptr 32	// 用完之后立马读出来
+			nop
+			simd_leaky d1 br1 10
+
+			simd_mac16_8 br0_0 k8 in0
+			simd_mac16_8 br0_1 k9 in0
+			simd_mac16_8 br0_2 k10 in0
+			simd_mac16_8 br0_3 k11 in0
+			nop
+
+			s64 output_ptr d0
+			s64 output_ptr d1 8
+			simd_leaky d0 br0 10
+			s64 output_ptr d0 16
+
+			inc output_ptr output_stride
+		}
+		inc output_start 24
+		inc bias_ptr 48
+		inc i 1
+	}
+	$jump_regs end
+	ret

@@ -1,0 +1,329 @@
+//---------------LAYER 0(conv)-------------
+//input:176x88x3
+//output:88x44x8
+//k3s2p1,group=1
+//leaky
+
+#include "window_param.upinc"
+
+#import layer_0_input
+#import layer_1_input
+
+#define kernel_ptr ptr0
+
+#define dst_wh r0
+#define dst_wh2 r1
+#define dst_wh4 r2
+#define dst_wh6 r3
+#define dst_wh8 r4
+#define dst_wh10 r5
+#define dst_wh12 r6
+#define dst_wh14 r7
+#define dst_wh16 r8
+
+#define dst_ptr r9
+#define dst_ptr_end r10
+#define kstart_ptr r11
+#define bias_ptr r12
+
+#define in_0 s8
+#define in_1 s9
+#define in_2 s10
+#define in_3_128 s11
+#define in_3_copy s7
+#define in_3 s7_01
+
+#define k0_0 s0
+#define k0_1 s1
+#define k0_2 s2
+#define k0_3 d5
+
+#define k1_0 s3
+#define k1_1 s4
+#define k1_2 s12
+#define k1_3 d6
+
+#define kn_0 s13
+#define kn_1 s14
+#define kn_2 s15
+#define kn_3 d7
+
+
+
+#define br0 s5
+#define br0_0 s5_0
+#define br0_1 s5_1
+#define br0_2 s5_2
+#define br0_3 s5_3
+
+#define br1 s6
+#define br1_0 s6_0
+#define br1_1 s6_1
+#define br1_2 s6_2
+#define br1_3 s6_3
+
+
+
+layer_0:
+	// 初始化窗口读取
+	bit_set r91, r91, 31
+
+	svw VDMA1_ADDR_0 VDMA1_PARAM_0
+	svw VDMA1_ADDR_1 VDMA1_PARAM_1
+	svw VDMA1_ADDR_2 VDMA1_PARAM_2
+	svw VDMA1_ADDR_3 VDMA1_PARAM_3
+	svw VDMA1_ADDR_4 layer_0_input
+
+	// 设置其他参数
+	lcs dst_wh 3872		// dst_wh = 88*44 = 3872
+	sl dst_wh2 dst_wh 1	// dst_wh2 = 88*44*2 = 7744
+	sl dst_wh4 dst_wh 2
+	sl dst_wh8 dst_wh 3
+	sl dst_wh16 dst_wh 4
+	add dst_wh6 dst_wh2 dst_wh4
+	add dst_wh10 dst_wh6 dst_wh4
+	add dst_wh12 dst_wh6 dst_wh6 
+	add dst_wh14 dst_wh6 dst_wh8
+
+	lc dst_ptr layer_1_input
+	add dst_ptr_end dst_ptr dst_wh2	
+
+	lcs bias_ptr layer_0_biases
+	lcs kernel_ptr layer_0_kernels
+	add kstart_ptr kernel_ptr 56
+	inc kstart_ptr 56
+
+	lm  k0_0 kernel_ptr
+	lm  k0_1 kernel_ptr
+	lm  k0_2 kernel_ptr
+	l64 k0_3 kernel_ptr
+	lm  k1_0 kernel_ptr
+	lm  k1_1 kernel_ptr
+	lm  k1_2 kernel_ptr
+	l64 k1_3 kernel_ptr
+
+	#jump-regs r30 ...
+	whileu dst_ptr < dst_ptr_end {
+
+		lm br0 bias_ptr
+		lm br1 bias_ptr 16
+		mov kernel_ptr kstart_ptr
+		hlt 17 // 等待窗口数据
+
+		simd_copy in_3_copy in_3_128
+
+		// 输出通道0 + 1 + 2
+		simd_muladd 	br0_0 in_0 k0_0
+		nop
+		nop
+		nop
+		simd_muladd 	br0_0 in_1 k0_1
+		nop
+		nop
+		nop
+		simd_muladd 	br0_0 in_2 k0_2
+		nop
+		nop
+		nop
+		simd_muls16_add br0_0 in_3 k0_3
+
+		simd_muladd 	br0_1 in_0 k1_0
+		nop
+		nop
+		nop
+		simd_muladd 	br0_1 in_1 k1_1
+		nop
+		nop
+		nop
+		simd_muladd 	br0_1 in_2 k1_2
+		nop
+		nop
+		nop
+		simd_muls16_add br0_1 in_3 k1_3
+
+		lm  kn_0 kernel_ptr
+		lm  kn_1 kernel_ptr
+		lm  kn_2 kernel_ptr
+		l64 kn_3 kernel_ptr
+		simd_muladd 	br0_2 in_0 kn_0
+		nop
+		nop
+		nop
+		simd_muladd 	br0_2 in_1 kn_1
+		nop
+		nop
+		nop
+		simd_muladd 	br0_2 in_2 kn_2
+		nop
+		nop
+		nop
+		simd_muls16_add br0_2 in_3 kn_3
+
+		// 输出通道1
+
+		// 输出通道2
+		// 从通道2开始需要读kernel
+
+		// 输出通道3
+		lm  kn_0 kernel_ptr
+		lm  kn_1 kernel_ptr
+		lm  kn_2 kernel_ptr
+		l64 kn_3 kernel_ptr
+		simd_muladd 	br0_3 in_0 kn_0
+		nop
+		nop
+		nop
+		simd_muladd 	br0_3 in_1 kn_1
+		nop
+		nop
+		nop
+		simd_muladd 	br0_3 in_2 kn_2
+		nop
+		nop
+		nop
+		simd_muls16_add br0_3 in_3 kn_3
+
+		// 输出通道4, 读kernel
+		lm  kn_0 kernel_ptr
+		lm  kn_1 kernel_ptr
+		lm  kn_2 kernel_ptr
+		l64 kn_3 kernel_ptr
+
+		// 激活br0=>d0
+		simd_leaky d0 br0 8
+		// 计算通道4
+		simd_muladd 	br1_0 in_0 kn_0
+		nop
+		nop
+		nop
+		simd_muladd 	br1_0 in_1 kn_1
+		nop
+		nop
+		nop
+		simd_muladd 	br1_0 in_2 kn_2
+		nop
+		nop
+		nop
+		simd_muls16_add br1_0 in_3 kn_3
+
+		// 输出通道5
+		lm  kn_0 kernel_ptr
+		lm  kn_1 kernel_ptr
+		lm  kn_2 kernel_ptr
+		l64 kn_3 kernel_ptr
+		simd_muladd 	br1_1 in_0 kn_0
+		nop
+		nop
+		nop
+		simd_muladd 	br1_1 in_1 kn_1
+		nop
+		nop
+		nop
+		simd_muladd 	br1_1 in_2 kn_2
+		nop
+		nop
+		nop
+		simd_muls16_add br1_1 in_3 kn_3
+
+
+		// 输出通道6
+		lm  kn_0 kernel_ptr
+		lm  kn_1 kernel_ptr
+		lm  kn_2 kernel_ptr
+		l64 kn_3 kernel_ptr
+		simd_muladd 	br1_2 in_0 kn_0
+		nop
+		nop
+		nop
+		simd_muladd 	br1_2 in_1 kn_1
+		nop
+		nop
+		nop
+		simd_muladd 	br1_2 in_2 kn_2
+		nop
+		nop
+		nop
+		simd_muls16_add br1_2 in_3 kn_3
+
+
+		// 输出通道7
+		lm  kn_0 kernel_ptr
+		lm  kn_1 kernel_ptr
+		lm  kn_2 kernel_ptr
+		l64 kn_3 kernel_ptr
+		simd_muladd 	br1_3 in_0 kn_0
+		nop
+		nop
+		nop
+		simd_muladd 	br1_3 in_1 kn_1
+		nop
+		nop
+		nop
+		simd_muladd 	br1_3 in_2 kn_2
+		nop
+		nop
+		nop
+		simd_muls16_add br1_3 in_3 kn_3
+
+		img_data_rd // 移动窗口
+
+		// 写d0
+		ssu dst_ptr d0_lo 0
+		ss  dst_ptr d0_lo dst_wh2
+		ssu dst_ptr d0_hi dst_wh4
+		ss  dst_ptr d0_hi dst_wh6
+
+		// 激活br1=>d0
+		simd_leaky d0 br1 8
+		lm br0 bias_ptr
+
+		ssu dst_ptr d0_lo dst_wh8
+		ss  dst_ptr d0_lo dst_wh10
+		ssu dst_ptr d0_hi dst_wh12
+		ss  dst_ptr d0_hi dst_wh14
+
+		inc dst_ptr 2
+	}
+	ret
+
+layer_0_biases:
+.word 0x0005da00 0x00045100 0x0003d800 0x00026f00 
+.word 0xffffea00 0x0003d600 0x0000f700 0xffff9900 
+
+layer_0_kernels:
+
+
+.short 0x0034 0xfe63 0x01e3 0x00ce 0xf99a 0x05b9 0x00b0 0xfb30 
+.short 0x03f3 0x0013 0xfe4a 0x014d 0xffd3 0xff93 0xffe1 0x007c 
+.short 0xff0c 0x0008 0x0057 0x009c 0xfe8e 0x0017 0x0138 0xfe57 
+.short 0x0009 0x00d8 0xfeae 0
+.short 0x0026 0xff7e 0x005a 0x0200 0x00f1 0x002f 0xfed2 0xff6f 
+.short 0xff7e 0xff77 0xff48 0x007b 0x03ef 0x014d 0x0003 0xfbce 
+.short 0xff4d 0xffde 0xff86 0xff72 0x00c1 0x02fd 0x003b 0xff51 
+.short 0xfdb6 0x007b 0xffac 0
+.short 0x0099 0x022e 0xfe8f 0xfdb7 0x01ff 0xfd38 0x01a0 0x0267 
+.short 0xfc2e 0xfdca 0xff83 0xff55 0xf8f9 0xfd9f 0xfede 0xfa6e 
+.short 0xfe32 0xfed3 0x02c3 0xfded 0x0286 0x08b4 0x006a 0x0317 
+.short 0x04a2 0xff36 0x0495 0
+.short 0x0704 0xffb6 0xff65 0x0e0c 0x008c 0xff3a 0x0978 0x00dc 
+.short 0x0042 0xfd71 0xfd2a 0xffb1 0xf75f 0xf8ac 0x0026 0xf7f0 
+.short 0xfb67 0xff91 0xfc98 0x02ff 0x010b 0xfac9 0x0626 0xfffa 
+.short 0xff43 0x045c 0xff34 0
+.short 0x01ac 0x0092 0x0036 0x00e1 0x0068 0xffc3 0xff8e 0x007f 
+.short 0x0006 0x043c 0xff53 0xffd8 0x0437 0xfe8b 0x0047 0x01af 
+.short 0xfec9 0x0024 0xffc5 0x006a 0x007d 0xfde1 0x0056 0x0039 
+.short 0xfe6d 0x0060 0x007a 0
+.short 0x0547 0x00cd 0xfeb3 0xfb5e 0xfe87 0x010d 0xffb0 0xffa0 
+.short 0x00a4 0x076f 0x00b6 0xfed4 0xf9c5 0xff98 0x0095 0xff3b 
+.short 0x00d2 0x0058 0x02d7 0xfef8 0x0004 0xfd26 0x0069 0x005c 
+.short 0x003d 0x00d4 0xff1b 0
+.short 0x0190 0xff3f 0xff03 0x0530 0xfbca 0xfee4 0x01d7 0xff6f 
+.short 0xff18 0x010b 0xfef4 0xffa1 0x0a8c 0xf84b 0xfcbb 0x04dd 
+.short 0xfcb7 0xfeb0 0x028c 0xfe14 0xff8c 0x0386 0xfb4b 0x0101 
+.short 0x039b 0xfc4d 0x001b 0
+.short 0x00ec 0x013c 0xffb8 0x0222 0x01e5 0xfe6c 0xff85 0x01f3 
+.short 0xfe0a 0x00a2 0xfe43 0x01c6 0x04b0 0xfec0 0x0151 0x0326 
+.short 0xfff6 0xfeb7 0xfce6 0xfff0 0x012f 0xfdf6 0xff6c 0x01e5 
+.short 0x0013 0x0044 0x00ab 0
+
+

@@ -1,0 +1,115 @@
+
+
+#include upsample.upinc
+
+#define input_ptr ptr0
+#define output_r0 ptr1
+#define output_r1 ptr2
+#define merge_r0 ptr3
+#define merge_r1 ptr4
+
+#define inc_end r5
+#define out_ptr r6
+#define in_stride r7
+
+#define in_row_size r8
+#define input_end r9
+#define input_row_end r10
+#define out_row_size r11
+
+#define merge_ptr r12
+#define merge_row_size r13
+
+@export upsample_merge
+upsample_merge:
+	
+	lcs in_stride, 96*2
+	muls16 in_row_size in_stride upsample_in_w
+	
+	lcs out_row_size, 144*2*2
+	muls16 out_row_size out_row_size upsample_in_w
+
+	lcs merge_row_size, 48*2*2
+	muls16 merge_row_size merge_row_size upsample_in_w
+
+	mov input_ptr upsample_in_adr
+	mov out_ptr upsample_out_adr
+	mov merge_ptr merge_in_adr
+
+	muls16 input_end upsample_in_w upsample_in_h
+	muls32 input_end input_end in_stride
+	inc input_end input_ptr
+
+	$jump_regs r20 r21
+	whileu input_ptr < input_end {
+
+		add input_row_end input_ptr in_row_size
+		mov output_r0 out_ptr
+		add output_r1 output_r0 out_row_size
+
+		mov merge_r0 merge_ptr
+		add merge_r1 merge_ptr merge_row_size 
+
+		whileu input_ptr < input_row_end {
+			lm_d s0  input_ptr
+			lm_d s1  input_ptr
+			lm_d s2  input_ptr
+			lm_d s3  input_ptr
+			lm_d s4  input_ptr
+			lm_d s5  input_ptr
+			lm_d s6  input_ptr
+			lm_d s7  input_ptr
+			lm_d s8  input_ptr
+			lm_d s9  input_ptr
+			lm_d s10 input_ptr
+			lm_d s11 input_ptr
+#define load_merge(ptr) \
+lm_d s12 ptr;\
+lm_d s13 ptr;\
+lm_d s14 ptr;\
+lm_d s15 ptr;\
+l64_d d0 ptr;\
+l64_d d1 ptr;\
+l64_d d2 ptr;\
+l64_d d3 ptr;
+
+#define save(ptr) \
+sm ptr s0 ;\
+sm ptr s1 ;\
+sm ptr s2 ;\
+sm ptr s3 ;\
+sm ptr s4 ;\
+sm ptr s5 ;\
+sm ptr s6 ;\
+sm ptr s7 ;\
+sm ptr s8 ;\
+sm ptr s9 ;\
+sm ptr s10;\
+sm ptr s11;\
+sm ptr s12;\
+sm ptr s13;\
+sm ptr s14;\
+sm ptr s15;\
+s64 ptr d0;\
+s64 ptr d1;\
+s64 ptr d2;\
+s64 ptr d3;
+
+			load_merge(merge_r0)
+			save(output_r0)
+			nop
+			load_merge(merge_r0)
+			save(output_r0)
+			nop
+
+			load_merge(merge_r1)
+			save(output_r1)
+			nop
+			load_merge(merge_r1)
+			save(output_r1)
+		}
+		mov out_ptr output_r1
+		mov merge_ptr merge_r1
+	}
+	$jump_regs end
+	ret

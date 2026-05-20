@@ -1,0 +1,12 @@
+@import LAYER_33_OUTPUT
+@import LAYER_34_OUTPUT
+@import layer34_kernel
+
+$func conv3s1x2_leaky_cwh(in input, in output, in tmp_channel, in channels, in kernels, in dstw, in dsth)
+
+entry:
+	conv3s1x2_leaky_cwh(LAYER_33_OUTPUT, LAYER_34_OUTPUT, tmp_channel, 24, layer34_kernel, 20, 15)
+	hlt
+
+tmp_channel:
+.reserve 20*15*4

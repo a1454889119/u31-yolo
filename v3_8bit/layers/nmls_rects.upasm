@@ -1,0 +1,117 @@
+#include layer_param.upinc
+
+#define curr_cx s5_2
+#define curr_cy s5_3
+#define curr_w s5_0
+#define curr_h s5_1
+
+#define rect_type s6_0
+#define rect_score s6_1
+#define rect_cx s7_2
+#define rect_cy s7_3
+#define rect_w s7_0
+#define rect_h s7_1
+
+$func check_rect_nmls() {
+	reg count, rect_ptr, rect_end, ignore
+	reg inter_x, inter_y, inter_area, union_area
+	reg curr_type, curr_score
+	reg curr_x, curr_y, rect_x, rect_y
+	reg t0, t1
+	reg rj_0, rj_1, rj_2, rj_3, rj_4
+	reg next_rj
+
+	lc rect_ptr, DEC_RECT_ADDR
+	lm s5 rect_ptr
+	lsl curr_type rect_ptr 16
+	lsl curr_score rect_ptr 18
+	srs curr_x curr_w 1
+	sub curr_x curr_cx curr_x
+	srs curr_y curr_h 1
+	sub curr_y curr_cy curr_y
+
+	lc rect_ptr, TARGETS_ADDR
+	lw count rect_ptr
+	inc rect_ptr 4
+
+    ifu count >= MAX_TARGET_COUNT {
+        return
+    }
+
+	// rect_end = rect_ptr + count*24
+	muls16 rect_end count 24
+	inc rect_end rect_ptr
+	
+	mov ignore 0
+	lc next_rj next_rect
+	$jump_regs rj_0 rj_1 rj_2 rj_3 rj_4
+	whileu rect_ptr < rect_end {
+		lm s6 rect_ptr
+		lm s7 rect_ptr 8
+		cjmpne next_rj curr_type rect_type
+
+		srs rect_x rect_w 1
+		sub rect_x rect_cx rect_x
+		srs rect_y rect_h 1
+		sub rect_y rect_cy rect_y
+
+		add t0 curr_x curr_w
+		add t1 rect_x rect_w
+		min t0 t0 t1
+		max t1 curr_x rect_x
+		sub inter_x t0 t1
+		mov inter_area 0
+		ifs inter_x > 0 {
+			add t0 curr_y curr_h
+			add t1 rect_y rect_h
+			min t0 t0 t1
+			max t1 curr_y rect_y
+			sub inter_y t0 t1
+			ifs inter_y > 0 {
+				muls32 inter_area inter_x inter_y
+			}
+		}
+
+		muls32 t0 curr_w curr_h
+		muls32 union_area rect_w rect_h
+		inc union_area t0
+		sub union_area union_area inter_area
+
+		// if (intersect_area / union_area > 0.4f) 
+		// intersect_area / union_area > 2 / 5
+		// intersect_area * 5 > union_area * 2
+		muls32 inter_area inter_area 5
+		sl union_area union_area 1
+		ifs inter_area > union_area {
+			// 到这里已经确定2个box重叠了.
+			// 下面就是根据得分判断保留哪一个box了.
+			mov ignore 1
+			ifs curr_score > rect_score {
+				sw rect_ptr curr_type 
+				sw rect_ptr curr_score, 4
+				sw rect_ptr curr_cx 16
+				sw rect_ptr curr_cy 20
+				sw rect_ptr curr_w 8
+				sw rect_ptr curr_h 12
+			}
+			jmp end_nmls
+		}
+next_rect:
+		inc rect_ptr 24
+	}
+	$jump_regs end
+
+	ifu ignore == 0 {
+		sw rect_end curr_type
+		sw rect_end curr_score, 4
+		sw rect_end curr_cx 16
+		sw rect_end curr_cy 20
+		sw rect_end curr_w 8
+		sw rect_end curr_h 12
+		lc rect_ptr, TARGETS_ADDR
+		inc count 1
+		sw rect_ptr count
+		nop
+	}
+end_nmls:
+}

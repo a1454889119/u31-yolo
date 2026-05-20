@@ -1,0 +1,44 @@
+#BUILD-INFO
+TYPE=APP
+NAME=yolo_simulate
+CFG=u31
+ENTRY_NAME=entry
+
+#DEBUG-INFO
+DEBUG_TYPE=IIC
+SIMULATE_DATA=simdata
+
+#OUTPUT-INFO
+PATH=out
+BIN=true
+HEX=true
+MAP=false
+OBJS=false
+
+#FILES
+[ext]upinc
+[ext]upasm
+
+#EXCLUDE
+[dir]out
+[dir]test
+[dir]cmos
+yolo_cmos.upasm
+yolo_single_frame.upasm
+yolo_multi_frame.upasm
+spi_cmos_test.upasm
+
+#MACROS
+#define WAIT_LAYER_0 1
+#define RECT_ADR_START 	0x18FFC
+#define RECT_ADR_END	0x20D00
+#define PSRAM_PARAM_ADR 0x0
+#define PSRAM_GROUP12_B_ADR 0x25A40
+#define PSRAM_LAYER_0_OUTPUT 0x2C340
+#define PSRAM_LAYER_0_INPUT 0x72340
+#define ENABLE_SPI_OUT 1
+#define SIMULATE 1
+#define wait_key nop
+
+#GENERATION
+PREFIX=u31_sys

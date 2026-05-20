@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LocalDebuggerEnvironment>PATH=D:\3rdparty\bin</LocalDebuggerEnvironment>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerCommandArguments>../data/320x224network.csv ../data/320x224weight.txt \\192.168.1.173\优象资料库\研发部\研发部\01-测试数据wdz\06-YOLO数据集\png_Beforelabel\ 320x224 bgr D:\data\u31_cover_test\yolo-320x224\png_Beforelabel.txt</LocalDebuggerCommandArguments>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LocalDebuggerEnvironment>PATH=D:\3rdparty\bin</LocalDebuggerEnvironment>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerCommandArguments>../data/320x224network.csv ../data/320x224weight.txt \\192.168.1.173\优象资料库\研发部\研发部\01-测试数据wdz\06-YOLO数据集\png_Beforelabel\ 320x224 bgr D:\data\u31_cover_test\yolo-320x224\png_Beforelabel.txt</LocalDebuggerCommandArguments>
+  </PropertyGroup>
+</Project>

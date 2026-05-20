@@ -1,0 +1,19 @@
+#include yolo_layer.upinc
+@import c6_20_14
+@import c12_20_14
+@import c6_10_7
+@import c12_10_7
+
+
+entry:
+	lc r30,0x09000040
+	sw r30,3
+
+	call yolo_layer_init
+	yolo_layer_update(c6_20_14, c12_20_14, 20, 14)
+	yolo_layer_update(c6_10_7, c12_10_7, 10, 7)
+
+	lc r30,0x09000040
+	lw r31,r30
+	
+	hlt

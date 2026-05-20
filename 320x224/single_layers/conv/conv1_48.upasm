@@ -1,0 +1,101 @@
+#include conv1.upinc
+
+#define kernel_ptr ptr0
+#define input_ptr ptr1
+#define output_ptr ptr2
+#define bias_ptr ptr3
+
+#define in_ptr r10
+#define out_ptr r11
+#define bias_end r13
+
+#define br0   s4
+#define br0_0 s4_0
+#define br0_1 s4_1
+#define br0_2 s4_2
+#define br0_3 s4_3
+
+#define br1   s5
+#define br1_0 s5_0
+#define br1_1 s5_1
+#define br1_2 s5_2
+#define br1_3 s5_3
+
+
+#define in_0 s0
+#define in_1 s1
+#define in_2 s2
+#define in_3 s3
+#define in_4 s12
+#define in_5 s13
+
+#define k_0 s6
+#define k_1 s7
+#define k_2 s8
+#define k_3 s9
+#define k_4 s10
+#define k_5 s11
+
+// 需要考虑输入输出stride
+@export conv1_48
+conv1_48:
+	mov in_ptr conv1_in_adr
+	mov out_ptr conv1_out_adr
+
+	lcs bias_end, 48*4
+	inc bias_end conv1_bias_adr
+	muls16 conv1_input_end conv1_w conv1_h
+	muls32 conv1_input_end conv1_input_end conv1_in_stride
+	inc conv1_input_end in_ptr
+	$jump_regs r20 r21
+	whileu in_ptr < conv1_input_end {
+		mov bias_ptr conv1_bias_adr
+		mov kernel_ptr conv1_kernel_adr
+
+		mov input_ptr in_ptr
+		mov output_ptr out_ptr
+		
+		lm_d in_0 input_ptr
+		lm_d in_1 input_ptr
+		lm_d in_2 input_ptr
+		lm_d in_3 input_ptr
+		lm_d in_4 input_ptr
+		lm_d in_5 input_ptr
+		
+		whileu bias_ptr < bias_end {
+			lm_d br0 bias_ptr
+			lm_d br1 bias_ptr
+#define calc(res) \
+lm_d k_0 kernel_ptr;\
+simd_mac16_8 res in_0 k_0;\
+lm_d k_1 kernel_ptr;\
+simd_mac16_8 res in_1 k_1;\
+lm_d k_2 kernel_ptr;\
+simd_mac16_8 res in_2 k_2;\
+lm_d k_3 kernel_ptr;\
+simd_mac16_8 res in_3 k_3;\
+lm_d k_4 kernel_ptr;\
+simd_mac16_8 res in_4 k_4;\
+lm_d k_5 kernel_ptr;\
+simd_mac16_8 res in_5 k_5;
+
+			calc(br0_0)
+			calc(br0_1)
+			calc(br0_2)
+			calc(br0_3)
+			calc(br1_0)
+			calc(br1_1)
+			calc(br1_2)
+			calc(br1_3)
+
+			simd_relu d0 br0 10
+			s64 output_ptr d0
+			simd_relu d1 br1 10
+			s64 output_ptr d1
+		}
+		inc in_ptr conv1_in_stride
+		inc out_ptr conv1_out_stride
+	}
+	$jump_regs end
+
+	ret

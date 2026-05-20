@@ -1,0 +1,201 @@
+#include layer_memory.upinc
+#include layer_param.upinc
+
+@import CMOS_INI_BF2013
+// @import CMOS_INI_BF30a2
+//@import CMOS_INI_BF3901
+@import yolo_run
+//@import transpose_160x320
+//@import write_uart
+@import write_uart_pool
+
+#define I2C_ADDR_SC035 0x30
+#define I2C_ADDR_BF203 0x6e
+#define I2C_ADDR_BF3a02 0x6e
+#define I2C_ADDR_BF30a2 0x6e
+
+
+entry:
+    //系统时钟配置
+    svw 0x09000038, 0x00ff8800
+	svw 0x09000000, 0x13024454 //pll1=242Mhz, pll2=40Mhz
+	svw 0x09000008, 0x400063   //flash=PLL2; music_clk=PLL2; sencor_clk=PLL2
+	svw ,TARGETS_ADDR, 0
+
+    //----------------------------------------------------------------------------	
+	//UART0 initial, 115200
+	//----------------------------------------------------------------------------
+    svw 0x09000800 0x00400016 //波特率参数divisor=串口时钟/(16*baud_rate) 0x00400087=9600  0x0040000b=115200
+
+    svw 0x09000b00 2
+    svw 0x09000b04 2
+    svw 0x09000b08 0
+
+    //图像输出配置-SPI-MTK 240x320
+    svw 0x09000430, 0x95000000  //连续模式
+    svw 0x09000434, 0x10000000
+    svw 0x09000438, 0x2000      //时钟反向,可以解决数据边沿和时钟采样边沿太近的问题,输出only y,缩放和剪切都不要
+    svw 0x0900043c, 0x00f00140  //240x320
+
+    //图像输出时钟使能
+    // svw 0x09000018, 2
+    svw 0x09000018, 1 //cls-music
+    hlt 10000
+
+    //I2C配置
+    svw 0x09000128, 0x3        //I2C1设备复位,I2C2设备复位
+    svw 0x09000100, 0x02410084 //I2C1使能,非DMA,I2C时钟高电平脉宽=0xfe,I2C时钟分频值=0x1fe
+    svw 0x09000104, 0xf        //I2C_dlay
+
+    // 读ID
+    svw 0x0900011c, 0xfc 
+    svw 0x09000124, 0x20016e
+    hlt 1
+    lvw r2, 0x0900011c //id r2
+
+    // lc ptr1,0
+    // lc r3,0x00000139
+    // ifu r2==r3 {//BF3901
+    //     lc ptr1,CMOS_INI_BF3901
+    //     /**
+    //      * 图像输入配置
+    //      * 格式:yuv422
+    //      * 分辨率:240*320
+    //      * 存储分辨率:160*320
+    //      * 接口:spi-mtk
+    //      * 适用模组:BF3901
+    //      */
+    //     svw 0x09000300, 0x12010028      //剪切,spi-mtk,yuv422, only y,msb
+    //     svw 0x09000304, 0x201           //中断使能
+    //     svw 0x09000308, 0xf00140        //输入分辨率 240x320
+    //     svw 0x0900030c, 0xa00140        //存储分辨率 160x320
+    //     svw 0x09000310, IMAGE_ADDR
+    //     svw 0x09000318, 0               //缩放
+    //     svw 0x0900031c, 0x1000240       //MTK指令码
+    //     svw 0x09000320, 0xffffff        //MTK_sync_code 同步字
+    // }
+
+    // lc ptr1,0
+    // lc r3,0x0000023B
+    // ifu r2==r3 {//bf30a2
+    //     lc ptr1,CMOS_INI_BF30a2
+    //     /**
+    //      * 图像输入配置
+    //      * 格式:only y
+    //      * 分辨率:240*320
+    //      * 存储分辨率:120*160
+    //      * 接口:spi-mtk
+    //      * 适用模组:bf30a2
+    //      */
+    //     svw 0x09000300, 0x32480000    //剪切,spi-mtk,only y,msb 
+    //     svw 0x09000304, 0x201 //中断使能
+    //     svw 0x09000308, 0xf00140 //输入分辨率
+    //     svw 0x0900030c, 0xa00140 //存储分辨率 160x320
+    //     svw 0x09000310, IMAGE_ADDR
+    //     svw 0x09000318, 0//缩放
+    //     svw 0x0900031c, 0x1000240 //MTK指令码
+    //     svw 0x09000320, 0xffffff  //MTK_sync_code 同步字
+    // }
+
+    lc r3, 0x00000337
+    ifu r2==r3 {
+       lc ptr1, CMOS_INI_BF2013        
+ 		/*
+		 * 兴芯微-BF2013
+        * 图像输入配置
+        * 格式:yuyv
+        * 存储格式:only y
+        * 分辨率:640*480
+        * 存储分辨率:320*160 480/2-40*2
+        * 接口:dvp
+        * 适用模组:bf2013
+        */
+       svw 0x09000300, 0x12c02800       //dvp, yuv422, only y, lsb; 将CMOS输出的yuv422格式当做only y,此时宽度x2
+       svw 0x09000304, 0x201
+       svw 0x09000308, 0x50001e0        //输入分辨率 640x480 当作 1280x480
+       svw 0x0900030c, 0x14000a0        //存储分辨率 320*160
+       svw 0x09000310, IMAGE_TRANS_ADDR
+       svw 0x09000318, 0x13010101      //缩放2
+    }
+
+    ifu ptr1==0 {//没找到摄像头,排查硬件
+        whileu 1==1 {
+            nop
+        }
+    }
+    
+    //配置CMOS
+    lc r0,0x0900011c
+    whileu r0 != 0 {
+        lsl r1,ptr1
+        lc r2,0xffffffff
+        ifu r1 == r2{
+            break
+        }
+        ssl r0,r1
+
+        lc r2,0x09000124
+        lc r1,0x11016e
+        sw r2,r1
+        hlt 1
+    }
+    
+    lc r30,0
+	
+	svw 0x09000040 3
+loop:
+	lv r0 frame_count
+	inc r0 1
+	sv frame_count r0
+
+	hlt 3
+	cache_clr
+    //svw 0x09000300 0x02802800 //关闭图像输入
+	//svw 0x09000300 0x02010028  //关闭图像输入 BF3901
+	svw 0x09000300 0x02c02800 // BF2013
+	svw 0x09000304 0x001
+	
+	//// 将前一帧的结果写在当前帧图像中
+	//lc ptr0, TARGETS_ADDR
+	//lc ptr1, IMAGE_TRANS_ADDR//IMAGE_ADDR
+	//lcs r0 0
+	//lw r1 ptr0
+	//sw ptr1 r1
+	//whileu r0 < r1 {
+	//	lm_d s4 ptr0
+	//	l64_d d0 ptr0
+	//	sw ptr1 s4_0
+	//	sw ptr1 s4_1
+	//	sw ptr1 s4_2
+	//	sw ptr1 s4_3
+	//	sw ptr1 d0_lo
+	//	sw ptr1 d0_hi 
+	//	inc r0 1
+	//}
+
+	svw 0x09000444, IMAGE_TRANS_ADDR //SPI输出240x320
+	hlt 15 // 等待传输完成
+
+	//// 图像旋转90度
+	//lc r0, IMAGE_ADDR
+	//lc r1, IMAGE_TRANS_ADDR
+	//call transpose_160x320
+	
+	// 执行检测
+	call yolo_run
+	
+	call write_uart_pool
+
+    //svw 0x09000300 0x12802800 //开启图像输入
+	//svw 0x09000300 0x12010028  //关闭图像输入 BF3901
+	svw 0x09000300 0x12c02800 // BF2013
+    svw 0x09000304 0x201
+    svw 0x09000044 0xc
+
+    jmp loop
+
+frame_count:
+.word 0
+
+UART_TX_BUF:
+.byte 0x55,0x08, 0x01,0x00,0x00,0xa0, 0x01,0x20,0x00,0xc0, 0x89,0xaa

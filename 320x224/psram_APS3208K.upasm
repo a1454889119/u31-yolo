@@ -1,0 +1,114 @@
+#define PSRAM_REG_ADR      r48
+#define PSRAM_REG_BUF      r49
+#define PSRAM_REG_CMD      r56
+#define PSRAM_REG_RUN      r36 
+
+@import tmp_buf
+@export psram_init_APS3208K
+psram_init_APS3208K:
+	push rp
+	svw 0x09000b20,0xffffffff
+	svw 0x09000b24,0xffffffff
+
+	//spi config
+	svw 0x09000600,0xf00885b8
+
+    svw 0x09000618,0x00000200
+    svw 0x09000614,0x00000080
+
+    //Latency config
+#if 1    
+    svw 0x09000604,0x4600742f      //用dm/dqs
+#else
+    svw 0x09000604,0x49005406 //不用dm/dqs
+#endif
+//buf_set  
+	lc r0, 0x09000458
+	lc r1, ((tmp_buf>>4)<<16) | ((tmp_buf+5120-16)>>4) 
+	sw r0, r1
+
+	lc r0, 0x0900045c
+	lc r1, 0x00000140
+	sw r0, r1
+	//cmd
+    lc PSRAM_REG_ADR, 0x09000608
+    lc PSRAM_REG_BUF, 0x0900060c
+    lc PSRAM_REG_CMD, 0x09000610
+    lc PSRAM_REG_RUN, 0x09000620 
+
+#if 0
+#else 
+	//soft reset
+    svw psram_tmp_buf,0
+    
+    lc r0, 0
+    lc r1, psram_tmp_buf
+    lc r2, 0xff800002
+
+    sw PSRAM_REG_ADR, r0
+    sw PSRAM_REG_BUF, r1
+    sw PSRAM_REG_CMD, r2
+    sw PSRAM_REG_RUN, 1
+
+    hlt 7
+
+    hlt 100000
+ 
+    //
+    svw psram_tmp_buf, 0
+    lc r0, 0
+    lc r1, psram_tmp_buf
+    lc r2, 0xff800002
+
+    sw PSRAM_REG_ADR, r0
+    sw PSRAM_REG_BUF, r1
+    sw PSRAM_REG_CMD, r2
+    sw PSRAM_REG_RUN, 1
+
+    hlt 7
+
+    hlt 10000
+
+    //write mr0
+    svw psram_tmp_buf, 0x00008d01 //增加驱动能力
+    
+    lc r0,0
+    lc r1,psram_tmp_buf
+    lc r2,0xc0800002  
+
+    sw PSRAM_REG_ADR, r0
+    sw PSRAM_REG_BUF, r1
+    sw PSRAM_REG_CMD, r2
+    sw PSRAM_REG_RUN, 1
+  
+    hlt 7
+    
+    hlt 1000
+  
+    //read mr0
+    svw psram_tmp_buf, 0
+   
+    lc r0,0
+    lc r1, psram_tmp_buf
+    lc r2,0x40000002  
+   
+    sw PSRAM_REG_ADR, r0
+    sw PSRAM_REG_BUF, r1
+    sw PSRAM_REG_CMD, r2
+    sw PSRAM_REG_RUN, 1
+ 
+    hlt 7
+   
+    cache_clr
+   
+    lvw r13, psram_tmp_buf //MR0:MR1 0x8d12
+   
+    hlt 1000
+#endif
+
+	pop rp
+    
+    ret
+
+psram_tmp_buf:
+    .word 0 0 0 0 

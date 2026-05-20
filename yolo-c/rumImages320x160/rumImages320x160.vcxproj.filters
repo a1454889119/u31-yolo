@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="runImages320x160.cpp" />
+    <ClCompile Include="..\source\util_func\util_func.cpp">
+      <Filter>util_func</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="util_func">
+      <UniqueIdentifier>{81a70ad5-f317-4ed9-9057-e229086a813f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\source\util_func\util_func.hpp">
+      <Filter>util_func</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

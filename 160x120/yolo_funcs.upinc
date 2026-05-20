@@ -1,0 +1,36 @@
+$func conv1_8in_8out_whc(in input, in output, in kernels, in width_x_height)
+$func conv1_8in_24out_cwh(in input, in output, in kernels, in width_x_height, in outstride)
+$func conv1_12in_12out_whc(in input, in output, in kernels, in width_x_height, in instride)
+$func conv1_20in_2out_linear_cwh(in input, in output, in kernels, in width_x_height, in outstride)
+$func conv1_20in_20out_linear_cwh(in input, in output, in kernels, in width_x_height, in outstride)
+$func conv1_24in_20out_linear_whc(in input, in output, in kernels, in width_x_height)
+$func conv1_24inout_1x1_sigmoid(in input, in output, in kernels)
+$func conv1_24inout_whc(in input, in output, in kernels, in width_x_height, in instride)
+$func conv1_24inout_cwh(in input, in output, in kernels, in width_x_height, in outstride)
+$func conv1_48in_8nout_whc(in input, in output, in nn, in kernels, in width_x_height)
+$func conv1_48in_8nout_cwh(in input, in output, in nn, in kernels, in width_x_height)
+$func conv1_48in_8nout_whc_cwh(in input, in outwhc, in outcwh, in nn, in kernels, in width_x_height, in outstride)
+$func conv1_96in_48out_whc(in input, in output, in kernels, in width_x_height)
+$func conv1_120in_48out_cwh(in input, in output, in kernels, in width_x_height)
+
+$func conv3s1_leaky_cwh(in input, in output, in channels, in kernels, in dstw, in dsth, in outstride)
+$func conv3s1x2_leaky_cwh(in input, in output, in tmp_channel, in channels, in kernels, in dstw, in dsth)
+$func conv3s2_1in_8out_cwh(in input, in output, in kernels, in width_x_height)
+$func conv3s2_linear_cwh(in input, in output, in channels, in kernels, in dstw, in dsth)
+$func conv3s2_leaky_cwh(in input, in output, in channels, in kernels, in dstw, in dsth)
+
+$func global_avg_pool_20x16(in input, in output, in channels)
+$func global_avg_pool_40x32(in input, in output, in channels)
+$func maxpool5_cwh(in input, in outcwh, in width, in height, in channels, in outstride)
+$func maxpool5_whc_cwh(in input, in outwhc, in outcwh, in width, in height, in channels, in outstride)
+$func mul_20x16_whc(in input0, in input1, in output, in channels)
+$func mul_40x32_whc(in input0, in input1, in output, in channels)
+$func upsample_whc(in input, in output, in width, in height, in channels)
+
+$func yolo_reset()
+//$func yolo(in input_c40, in input_c2, in width, in height, in scale)
+
+$func conv1_decode_score(in input, in width, in height, in channels, in kernels)
+@import temp_target_count
+
+$func conv1_decode_rect(in input, in width, in height, in scale, in kernels)

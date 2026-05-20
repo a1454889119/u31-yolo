@@ -1,0 +1,29 @@
+//---------------LAYER 9(shortcut)-------------
+//input:44x22x8
+//output:44x22x8
+//6
+//linear
+//layer_9_scales:
+//.short 0x0400 0x0400
+
+// 44x22x8=>44x22x8 shortcut, linear, 输入cwh 输出cwh
+@import layer_6_input
+@import layer_9_input
+@import layer_10_input
+
+@import shortcut_params
+@import shortcut_8c_s1
+
+layer_9:
+	//shortcut_params:
+	//.word 0 // whc_x2
+	//.word 0 // input0_adr
+	//.word 0 // input1_adr
+	//.word 0 // output_adr
+	lcs ptr0 shortcut_params
+	sv ptr0 15488
+	sv ptr0 layer_6_input
+	sv ptr0 layer_9_input
+	sv ptr0 layer_10_input
+	call shortcut_8c_s1
+	ret

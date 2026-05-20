@@ -1,0 +1,32 @@
+#BUILD-INFO
+TYPE=APP
+NAME=app
+CFG=u31
+ENTRY_NAME=entry
+
+#DEBUG-INFO
+DEBUG_TYPE=IIC
+SIMULATE_DATA=simdata
+
+#OUTPUT-INFO
+PATH=out
+BIN=true
+HEX=true
+MAP=false
+OBJS=false
+
+#FILES
+maxpool.upasm
+maxpool.upinc
+init_psram.upasm
+test_maxp.upasm
+#EXCLUDE
+[dir]out
+
+#MACROS
+#define PSRAM_LAYER_0_OUTPUT 0x50000
+#define PSRAM_LAYER_0_INPUT 0
+#define WAIT_LAYER_0 0
+
+#GENERATION
+PREFIX=u31_sys

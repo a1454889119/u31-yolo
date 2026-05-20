@@ -1,0 +1,9 @@
+@import LAYER_41_OUTPUT
+@import LAYER_42_OUTPUT
+@import layer42_kernel
+
+$func conv1_20in_20out_linear_cwh(in input, in output, in kernels, in width_x_height, in outstride)
+
+entry:
+	conv1_20in_20out_linear_cwh(LAYER_41_OUTPUT, LAYER_42_OUTPUT, layer42_kernel, 20*15, 40)
+	hlt

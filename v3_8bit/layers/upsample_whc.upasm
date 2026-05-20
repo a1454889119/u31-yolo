@@ -1,0 +1,136 @@
+#include layer_param.upinc
+#include yolo_funcs.upinc
+#include layer_regs.upinc
+
+
+#define w outw
+#define h outh
+#define c outc
+#define outptr0 outptr
+#define outptr1 ptr2
+
+#define i r18
+#define j r19
+#define k r20
+#define nk r21
+#define w2 r22
+#define rj0 r23
+#define rj1 r24
+#define rj2 r25
+#define rj3 r26
+#define tmp r27
+
+@export upsample_whc
+upsample_whc:
+	mov inptr inadr
+	mov outptr0 outadr
+
+	ifu sizeFlag == SIZE_20X10X24 {
+		lcs w 20
+		lcs h 10
+		lcs c 24
+	} else {
+		lcs w 40
+		lcs h 20
+		lcs c 24
+	}
+	add w2 w w
+	add outptr1 outptr0 w2
+	srs nk w 3 // nk = w / 8
+
+	lcs i 0
+	$jump_regs rj0 rj1 rj2 rj3
+	whileu i < c {
+		lcs j 0
+		whileu j < h {
+
+			lcs k 0
+			whileu k < nk {
+				l64_d d0 inptr
+				simd_unpack8 s6 d0 d0
+				inc k 1
+				s64 outptr0 s6_01
+				s64 outptr0 s6_23
+				s64 outptr1 s6_01
+				s64 outptr1 s6_23
+			}
+			sl k k 3
+			whileu k < w {
+				lbyte tmp inptr
+				sbyte outptr0 tmp
+				sbyte outptr0 tmp
+				sbyte outptr1 tmp
+				sbyte outptr1 tmp
+				inc k 1
+			}
+			inc outptr0 w2
+			inc outptr1 w2
+			inc j 1
+		}
+		inc i 1
+	}
+	$jump_regs end
+	
+	ret
+
+/*
+#define inptr ptr0
+#define outptr0 ptr1
+#define outptr1 ptr2
+
+$func upsample_whc(in sizetype) {
+	reg i, j, k, nk, w, h, c, w2
+	reg rj0, rj1, rj2, rj3, tmp
+	reg param_ptr(rj0), type
+
+	lc param_ptr, LAYER_PARAM_ADDR
+	lw inptr param_ptr, INPUT_ADDR_OFF
+	lw outptr0 param_ptr, OUTPUT_ADDR_OFF
+	load_reg type sizetype
+	ifu type == SIZE_20X10X24 {
+		lcs w 20
+		lcs h 10
+		lcs c 24
+	} else {
+		lcs w 40
+		lcs h 20
+		lcs c 24
+	}
+	add w2 w w
+	add outptr1 outptr0 w2
+	srs nk w 3 // nk = w / 8
+
+	lcs i 0
+	$jump_regs rj0 rj1 rj2 rj3
+	whileu i < c {
+		lcs j 0
+		whileu j < h {
+
+			lcs k 0
+			whileu k < nk {
+				l64_d d0 inptr
+				simd_unpack8 s6 d0 d0
+				inc k 1
+				s64 outptr0 s6_01
+				s64 outptr0 s6_23
+				s64 outptr1 s6_01
+				s64 outptr1 s6_23
+			}
+			sl k k 3
+			whileu k < w {
+				lbyte tmp inptr
+				sbyte outptr0 tmp
+				sbyte outptr0 tmp
+				sbyte outptr1 tmp
+				sbyte outptr1 tmp
+				inc k 1
+			}
+			inc outptr0 w2
+			inc outptr1 w2
+			inc j 1
+		}
+		inc i 1
+	}
+	$jump_regs end
+}
+*/

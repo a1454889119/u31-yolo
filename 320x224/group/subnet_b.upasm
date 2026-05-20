@@ -1,0 +1,169 @@
+#include layer_io_size.upinc
+#include memory_layout.upinc
+#include conv1.upinc
+#include dwconv.upinc
+
+@import conv1_24_whc
+@import conv1_24
+@import conv1_48_whc
+@import conv1_48
+
+@import tmp_rp_adr0
+@import tmp_rp_adr1
+
+@export group5
+@export group13
+
+#define t0 r20
+#define t1 r21
+#define t2 r22
+
+subnet_b_params:
+.word 0 // inw
+.word 0 // inh
+.word 0 // c
+subnet_b_func:
+.word 0 // conv1_whc
+.word 0 // conv1
+subnet_b_io_addr:
+.word 0 0 0 0
+subnet_b_kb_addr:
+.word 0 0 0 0 0 0
+subnet_b_off: 
+.word 0 // offset
+
+#define GROUP_5_ADDR_A (IO_ADR + 0)
+#define GROUP_5_ADDR_B (IO_ADR + 26880)
+#define GROUP_5_ADDR_C (IO_ADR + 53760)
+#define GROUP_5_ADDR_D (IO_ADR + 107520)
+group5:
+	sv tmp_rp_adr0 rp
+
+	lcs ptr0 subnet_b_params
+	nop
+	sw ptr0 40
+	sw ptr0 28
+	sw ptr0 24
+	sv ptr0 conv1_24_whc
+	sv ptr0 conv1_24
+	svw ptr0, GROUP_5_ADDR_A
+	svw ptr0, GROUP_5_ADDR_B
+	svw ptr0, GROUP_5_ADDR_C
+	svw ptr0, GROUP_5_ADDR_D
+	svw ptr0, LAYER_25_KERNEL_ADDR
+	svw ptr0, LAYER_25_BIAS_ADDR
+	svw ptr0, LAYER_26_KERNEL_ADDR
+	svw ptr0, LAYER_26_BIAS_ADDR
+	svw ptr0, LAYER_27_KERNEL_ADDR
+	svw ptr0, LAYER_27_BIAS_ADDR
+	sw ptr0 48
+	call subnet_b
+
+	lcs ptr0 subnet_b_kb_addr
+	svw ptr0, LAYER_29_KERNEL_ADDR
+	svw ptr0, LAYER_29_BIAS_ADDR
+	svw ptr0, LAYER_30_KERNEL_ADDR
+	svw ptr0, LAYER_30_BIAS_ADDR
+	svw ptr0, LAYER_31_KERNEL_ADDR
+	svw ptr0, LAYER_31_BIAS_ADDR
+	sw ptr0 0
+	call subnet_b
+	lv rp tmp_rp_adr0
+	ret
+
+#define GROUP_13_ADDR_A (IO_ADR + 0)
+#define GROUP_13_ADDR_B (IO_ADR + 13440)
+#define GROUP_13_ADDR_C (IO_ADR + 26880)
+#define GROUP_13_ADDR_D (IO_ADR + 53760)
+group13:
+	sv tmp_rp_adr0 rp
+
+	lcs ptr0 subnet_b_params
+	nop
+	sw ptr0 20
+	sw ptr0 14
+	sw ptr0 48
+	sv ptr0 conv1_48_whc
+	sv ptr0 conv1_48
+	svw ptr0, GROUP_13_ADDR_A
+	svw ptr0, GROUP_13_ADDR_B
+	svw ptr0, GROUP_13_ADDR_C
+	svw ptr0, GROUP_13_ADDR_D
+	svw ptr0, LAYER_68_KERNEL_ADDR
+	svw ptr0, LAYER_68_BIAS_ADDR
+	svw ptr0, LAYER_69_KERNEL_ADDR
+	svw ptr0, LAYER_69_BIAS_ADDR
+	svw ptr0, LAYER_70_KERNEL_ADDR
+	svw ptr0, LAYER_70_BIAS_ADDR
+	lcs t0 96
+	sw ptr0 t0
+	call subnet_b
+
+	lcs ptr0 subnet_b_kb_addr
+	svw ptr0, LAYER_72_KERNEL_ADDR
+	svw ptr0, LAYER_72_BIAS_ADDR
+	svw ptr0, LAYER_73_KERNEL_ADDR
+	svw ptr0, LAYER_73_BIAS_ADDR
+	svw ptr0, LAYER_74_KERNEL_ADDR
+	svw ptr0, LAYER_74_BIAS_ADDR
+	sw ptr0 0
+	call subnet_b
+	lv rp tmp_rp_adr0
+	ret	
+
+subnet_b:
+	sv tmp_rp_adr1 rp
+
+	lcs t0 subnet_b_params
+	lw conv1_w t0 0
+	lw conv1_h t0 4
+	lw t1 t0 8
+	sl conv1_in_stride t1 1
+	sl conv1_out_stride t1 1
+	lcs t0 subnet_b_io_addr
+	lw conv1_in_adr t0 8
+	lw conv1_out_adr t0 12
+	lcs t0 subnet_b_kb_addr
+	lw conv1_kernel_adr t0 0
+	lw conv1_bias_adr t0 4
+	lcs t0 subnet_b_func
+	lw t1 t0 0
+	call t1
+
+	lcs t0 subnet_b_params
+	lw dwconv_in_w t0 0
+	lw dwconv_in_h t0 4
+	lw dwconv_c t0 8
+	sru dwconv_out_w dwconv_in_w 1
+	sru dwconv_out_h dwconv_in_h 1
+	lcs t0 subnet_b_io_addr
+	lw dwconv_in_adr t0 12
+	lw dwconv_out_adr t0 4
+	lcs t0 subnet_b_kb_addr
+	lw dwconv_kernel_adr t0 8
+	lw dwconv_bias_adr t0 12
+	call dwconv3
+
+	lcs t0 subnet_b_params
+	lw conv1_w t0 0
+	lw conv1_h t0 4
+	lw t1 t0 8
+	sru conv1_w conv1_w 1
+	sru conv1_h conv1_h 1
+	sl conv1_in_stride t1 1
+	sl conv1_out_stride t1 2
+	lcs t0 subnet_b_io_addr
+	lw conv1_in_adr t0 4
+	lw conv1_out_adr t0 0
+	lcs t0 subnet_b_off
+	lw t1 t0 0
+	inc conv1_out_adr t1
+	lcs t0 subnet_b_kb_addr
+	lw conv1_kernel_adr t0 16
+	lw conv1_bias_adr t0 20
+	lcs t0 subnet_b_func
+	lw t1 t0 4
+	call t1
+
+	lv rp tmp_rp_adr1
+	ret

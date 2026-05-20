@@ -1,0 +1,7 @@
+
+#define layer0_kernel_adr r0
+#define layer0_bias_adr r1
+#define layer0_tmp_adr r2
+
+@import layer0_prepare
+@import layer0

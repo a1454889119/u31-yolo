@@ -1,0 +1,36 @@
+#BUILD-INFO
+TYPE=APP
+NAME=app
+CFG=u31
+ENTRY_NAME=entry
+
+#DEBUG-INFO
+DEBUG_TYPE=IIC
+SIMULATE_DATA=simdata
+
+#OUTPUT-INFO
+PATH=out
+BIN=true
+HEX=true
+MAP=false
+OBJS=false
+
+#FILES
+c6_20_14-py.upasm
+c12_20_14-py.upasm
+c6_10_7-py.upasm
+c12_10_7-py.upasm
+yolo_layer.upinc
+yolo_layer.upasm
+nmls_rect.upasm
+test_yolo.upasm
+
+#EXCLUDE
+[dir]out
+
+#MACROS
+#define RECT_ADR_START 	0x18FFC
+#define RECT_ADR_END	0x20D00
+
+#GENERATION
+PREFIX=u31_sys

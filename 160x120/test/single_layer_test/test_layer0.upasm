@@ -1,0 +1,11 @@
+@import IMAGE_DATA
+@import LAYER_0_OUTPUT
+@import layer0_kernel
+
+$func conv3s2_1in_8out_cwh(in input, in output, in kernels, in width_x_height)
+
+entry:
+
+	conv3s2_1in_8out_cwh(IMAGE_DATA, LAYER_0_OUTPUT, layer0_kernel, 80 * 60)
+
+	hlt

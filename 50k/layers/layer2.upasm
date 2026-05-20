@@ -1,0 +1,87 @@
+//---------------LAYER 2(conv)-------------
+//input:88x44x8
+//output:88x44x4
+//k1s1p0,group=1
+//linear
+#include "layers_common.upinc"
+
+#define wh r3
+#define input_ptr ptr0
+#define kernel_ptr r4
+#define output_ptr ptr1
+#define bias_ptr r5
+#define wh_x16 r6
+#define wh_x2 r7
+#define input_end r8
+
+#define br0 s6
+#define br0_0 s6_0
+#define br0_1 s6_1
+#define br0_2 s6_2
+#define br0_3 s6_3
+
+#define br1 s7
+#define br1_0 s7_0
+#define br1_1 s7_1
+#define br1_2 s7_2
+#define br1_3 s7_3
+
+#define in_0 s0
+#define in_1 s1
+#define k0 s2
+#define k1 s3
+#define k2 s4
+#define k3 s5
+
+@export layer_2
+layer_2:
+	lc input_ptr layer_1_output
+	lcs output_ptr layer_2_output
+	mov bias_ptr bias_addr
+	mov kernel_ptr kernel_addr
+
+	lcs wh 3872 // 88*44
+	sl wh_x16 wh 4
+	add input_end input_ptr wh_x16
+	lm k0 kernel_ptr
+	lm k1 kernel_ptr 16
+	lm k2 kernel_ptr 32
+	lm k3 kernel_ptr 48
+
+//	lm in_0 input_ptr
+//	lm in_1 input_ptr
+
+	// 每轮得到8个输出通道. 避免nop
+	$jump_regs r10 r11
+	whileu input_ptr < input_end {
+		lm in_0 input_ptr
+		lm in_1 input_ptr
+
+		lm br0 bias_ptr
+		lm br1 bias_ptr
+
+		simd_mac16_8 br0_0 in_0 k0
+		simd_mac16_8 br0_1 in_0 k1
+		simd_mac16_8 br0_2 in_0 k2
+		simd_mac16_8 br0_3 in_0 k3
+
+		simd_mac16_8 br1_0 in_1 k0
+		simd_mac16_8 br1_1 in_1 k1
+		simd_mac16_8 br1_2 in_1 k2
+		simd_mac16_8 br1_3 in_1 k3
+		nop
+//		lm in_0 input_ptr
+//		lm in_1 input_ptr
+//		ifu input_ptr == input_end {
+//			nop
+//		}
+
+		// 激活
+		simd_linear d0 br0 10
+		s64 output_ptr d0
+	
+		simd_linear d1 br1 10
+		s64 output_ptr d1
+	}
+	$jump_regs end
+	ret

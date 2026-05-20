@@ -1,0 +1,221 @@
+#include shuffle.upinc
+
+
+#define input_ptr ptr0
+#define input_ptr_2 ptr1
+
+#define in_data1 s0
+#define in_data2 s1
+#define in_data3 s2
+#define in_data4 s3
+
+#define input_end r4
+#define chx1 r5
+#define chx2 r6
+#define output_ptr r7
+#define output_ptr1 ptr1
+#define output_ptr2 ptr2
+
+@export shuffle_8_16
+@export shuffle_24
+@export shuffle_48
+@export shuffle_96
+
+shuffle_8_16:
+	lcs chx2 48
+	mov input_ptr shuffle_input_adr
+	mov input_ptr_2 shuffle_input_adr_2
+	mov output_ptr shuffle_output_adr
+	muls16 input_end shuffle_w shuffle_h
+	muls32 input_end input_end 16
+	inc input_end shuffle_input_adr
+	$jump_regs r20
+	whileu input_ptr < input_end {
+		lm_d in_data1 input_ptr
+		lm_d in_data2 input_ptr_2
+		lm_d in_data3 input_ptr_2
+
+		simd_shuffle128 s6 in_data1
+		simd_shuffle128 s7 in_data2
+
+		s64 output_ptr s6_01 0
+		s64 output_ptr s7_01 8
+
+		s64 output_ptr s6_23 24
+		s64 output_ptr s7_23 32
+
+		simd_shuffle128 s6 in_data3
+		nop
+		s64 output_ptr s6_01 16
+		s64 output_ptr s6_23 40
+		inc output_ptr chx2
+	}
+	$jump_regs end
+	ret
+
+	ret
+
+shuffle_24:
+	lcs chx2 48
+	mov input_ptr shuffle_input_adr
+	mov output_ptr shuffle_output_adr
+	muls16 input_end shuffle_w shuffle_h
+	muls32 input_end input_end chx2
+	inc input_end shuffle_input_adr
+	$jump_regs r20
+	whileu input_ptr < input_end {
+		lm_d in_data1 input_ptr
+		lm_d in_data2 input_ptr
+		lm_d in_data3 input_ptr
+
+		simd_shuffle128 s6 in_data1
+		simd_shuffle128 s7 in_data2
+
+		s64 output_ptr s6_01 0
+		s64 output_ptr s7_01 8
+
+		s64 output_ptr s6_23 24
+		s64 output_ptr s7_23 32
+
+		simd_shuffle128 s6 in_data3
+		nop
+		s64 output_ptr s6_01 16
+		s64 output_ptr s6_23 40
+		inc output_ptr chx2
+	}
+	$jump_regs end
+	ret
+
+shuffle_48:
+	lcs chx1 48
+	lcs chx2 96
+	mov input_ptr shuffle_input_adr
+	mov output_ptr shuffle_output_adr
+	muls16 input_end shuffle_w shuffle_h
+	muls32 input_end input_end chx2
+	inc input_end shuffle_input_adr
+	$jump_regs r20
+	whileu input_ptr < input_end {
+		mov output_ptr1 output_ptr
+		add output_ptr2 output_ptr1 chx1
+
+		lm_d in_data1 input_ptr
+		lm_d in_data2 input_ptr
+		simd_shuffle128 s6 in_data1
+		simd_shuffle128 s7 in_data2
+		lm_d in_data3 input_ptr
+		lm_d in_data4 input_ptr
+
+		s64 output_ptr1 s6_01
+		s64 output_ptr1 s7_01
+
+		s64 output_ptr2 s6_23
+		s64 output_ptr2 s7_23
+
+		simd_shuffle128 s6 in_data3
+		simd_shuffle128 s7 in_data4
+		lm_d in_data1 input_ptr
+		lm_d in_data2 input_ptr
+
+		s64 output_ptr1 s6_01
+		s64 output_ptr1 s7_01
+
+		s64 output_ptr2 s6_23
+		s64 output_ptr2 s7_23
+
+		simd_shuffle128 s6 in_data1
+		simd_shuffle128 s7 in_data2
+		s64 output_ptr1 s6_01
+		s64 output_ptr1 s7_01
+
+		s64 output_ptr2 s6_23
+		s64 output_ptr2 s7_23
+
+		inc output_ptr chx2
+	}
+	$jump_regs end
+	ret
+
+shuffle_96:
+	lcs chx1 96
+	lcs chx2 192
+	mov input_ptr shuffle_input_adr
+	mov output_ptr shuffle_output_adr
+	muls16 input_end shuffle_w shuffle_h
+	muls32 input_end input_end chx2
+	inc input_end shuffle_input_adr
+	$jump_regs r20
+	whileu input_ptr < input_end {
+		mov output_ptr1 output_ptr
+		add output_ptr2 output_ptr1 chx1
+
+		lm_d in_data1 input_ptr
+		lm_d in_data2 input_ptr
+		simd_shuffle128 s6 in_data1
+		simd_shuffle128 s7 in_data2
+		lm_d in_data3 input_ptr
+		lm_d in_data4 input_ptr
+
+		s64 output_ptr1 s6_01
+		s64 output_ptr1 s7_01
+
+		s64 output_ptr2 s6_23
+		s64 output_ptr2 s7_23
+
+		simd_shuffle128 s6 in_data3
+		simd_shuffle128 s7 in_data4
+		lm_d in_data1 input_ptr
+		lm_d in_data2 input_ptr
+
+		s64 output_ptr1 s6_01
+		s64 output_ptr1 s7_01
+
+		s64 output_ptr2 s6_23
+		s64 output_ptr2 s7_23
+
+		simd_shuffle128 s6 in_data1
+		simd_shuffle128 s7 in_data2
+		lm_d in_data3 input_ptr
+		lm_d in_data4 input_ptr
+
+		s64 output_ptr1 s6_01
+		s64 output_ptr1 s7_01
+
+		s64 output_ptr2 s6_23
+		s64 output_ptr2 s7_23
+
+		simd_shuffle128 s6 in_data3
+		simd_shuffle128 s7 in_data4
+		lm_d in_data1 input_ptr
+		lm_d in_data2 input_ptr
+
+		s64 output_ptr1 s6_01
+		s64 output_ptr1 s7_01
+
+		s64 output_ptr2 s6_23
+		s64 output_ptr2 s7_23
+
+		simd_shuffle128 s6 in_data1
+		simd_shuffle128 s7 in_data2
+		lm_d in_data3 input_ptr
+		lm_d in_data4 input_ptr
+
+		s64 output_ptr1 s6_01
+		s64 output_ptr1 s7_01
+
+		s64 output_ptr2 s6_23
+		s64 output_ptr2 s7_23
+
+		simd_shuffle128 s6 in_data3
+		simd_shuffle128 s7 in_data4
+
+		s64 output_ptr1 s6_01
+		s64 output_ptr1 s7_01
+
+		s64 output_ptr2 s6_23
+		s64 output_ptr2 s7_23
+
+		inc output_ptr chx2
+	}
+	$jump_regs end
+	ret

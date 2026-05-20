@@ -1,0 +1,60 @@
+#include layer_io_size.upinc
+#include memory_layout.upinc
+#include maxpool.upinc
+#include conv1.upinc
+#include dwconv.upinc
+
+@import conv1_8_whc
+@import conv1_8
+@import maxpool
+@import dwconv3
+@import tmp_rp_adr0
+
+#define GROUP0_A (IO_ADR + 0)
+#define GROUP0_B (IO_ADR + LAYER_1_OUTPUT_SIZE)
+#define GROUP0_C (IO_ADR + LAYER_1_OUTPUT_SIZE + LAYER_6_OUTPUT_SIZE)
+#define GROUP0_D (IO_ADR + 179200)
+
+@export group0
+group0:
+	sv tmp_rp_adr0 rp
+
+	lc maxp_in_adr PSRAM_LAYER_0_OUTPUT
+	lc maxp_out_adr, IO_ADR
+	call maxpool
+
+	lcs conv1_w 80
+	lcs conv1_h 56
+	// 输入8通道, 输出8通道
+	lcs conv1_in_stride 16
+	lcs conv1_out_stride 16
+	lc conv1_in_adr, GROUP0_A
+	lc conv1_out_adr, GROUP0_B
+	lc conv1_bias_adr, LAYER_6_BIAS_ADDR
+	lc conv1_kernel_adr, LAYER_6_KERNEL_ADDR
+	call conv1_8_whc
+
+	lcs dwconv_out_w 40
+	lcs dwconv_out_h 28
+	lcs dwconv_in_w 80
+	lcs dwconv_in_h 56
+	lcs dwconv_c 8
+	lc  dwconv_in_adr, GROUP0_B
+	lc  dwconv_out_adr, GROUP0_C
+	lc dwconv_bias_adr, LAYER_7_BIAS_ADDR
+	lc dwconv_kernel_adr, LAYER_7_KERNEL_ADDR
+	call dwconv3
+
+	lcs conv1_w 40
+	lcs conv1_h 28
+	// 输入8通道, 输出8通道
+	lcs conv1_in_stride 16
+	lcs conv1_out_stride 16
+	lc conv1_in_adr, GROUP0_C
+	lc conv1_out_adr, GROUP0_D
+	lc conv1_bias_adr, LAYER_8_BIAS_ADDR
+	lc conv1_kernel_adr, LAYER_8_KERNEL_ADDR
+	call conv1_8
+	
+	lv rp tmp_rp_adr0
+	ret

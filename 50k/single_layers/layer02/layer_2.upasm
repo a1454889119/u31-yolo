@@ -1,0 +1,107 @@
+//---------------LAYER 2(conv)-------------
+//input:88x44x8
+//output:88x44x4
+//k1s1p0,group=1
+//linear
+
+#define wh r0
+#define input_ptr ptr0
+#define kernel_ptr r1
+#define output_ptr ptr1
+#define bias_ptr r2
+#define wh_x16 r3
+#define wh_x2 r4
+#define input_end r5
+
+#define br0 s6
+#define br0_0 s6_0
+#define br0_1 s6_1
+#define br0_2 s6_2
+#define br0_3 s6_3
+
+#define br1 s7
+#define br1_0 s7_0
+#define br1_1 s7_1
+#define br1_2 s7_2
+#define br1_3 s7_3
+
+#define in_0 s0
+#define in_1 s1
+#define k0 s2
+#define k1 s3
+#define k2 s4
+#define k3 s5
+
+@import layer_2_input
+@import layer_3_input
+
+
+layer2:
+//	lcs r0 test_data
+//	lm s6 r0
+//	lm s7 r0 16
+//	simd_linear d0 s6 10
+//	simd_linear d1 s7 10
+//	
+//	srs r0 s4_0 10
+//	srs r1 s4_1 10
+//	srs r2 s4_2 10
+//	srs r3 s4_3 10
+//
+//test_data:
+//.word 0xFFFB1712 0x001704E2 0xFFD41404 0x0013FBD2
+//.word 0xffe7d725 0x0012ca60 0xffd6ecd4 0x00244b23
+	
+	lcs input_ptr layer_2_input
+	lcs output_ptr layer_3_input
+	lcs bias_ptr layer_2_biases
+	lcs kernel_ptr layer_2_kernels
+
+	lcs wh 3872 // 88*44
+	sl wh_x16 wh 4
+	add input_end input_ptr wh_x16
+	lm k0 kernel_ptr
+	lm k1 kernel_ptr 16
+	lm k2 kernel_ptr 32
+	lm k3 kernel_ptr 48
+
+	lm in_0 input_ptr
+	lm in_1 input_ptr
+
+	// 每轮得到8个输出通道. 避免nop
+	$jump_regs r10 r11
+	whileu input_ptr < input_end {
+		lm br0 bias_ptr
+		lm br1 bias_ptr
+
+		simd_mac16_8 br0_0 in_0 k0
+		simd_mac16_8 br0_1 in_0 k1
+		simd_mac16_8 br0_2 in_0 k2
+		simd_mac16_8 br0_3 in_0 k3
+
+		simd_mac16_8 br1_0 in_1 k0
+		simd_mac16_8 br1_1 in_1 k1
+		simd_mac16_8 br1_2 in_1 k2
+		simd_mac16_8 br1_3 in_1 k3
+
+		lm in_0 input_ptr
+		lm in_1 input_ptr
+
+		// 激活
+		simd_linear d0 br0 10
+		s64 output_ptr d0
+	
+		simd_linear d1 br1 10		
+		s64 output_ptr d1
+	}
+	$jump_regs end
+	ret
+
+	
+layer_2_biases:
+.word 0x0026ac00 0xffcfb800 0xffc29400 0xfff4b400 
+layer_2_kernels:
+.short 0x014b 0xfbd1 0x022b 0x003a 0xf9dc 0xfb9e 0x00be 0x01f7 
+.short 0x0366 0x016b 0x007c 0x0133 0x01b3 0x0139 0x06b6 0x00f0 
+.short 0x00f0 0x00ac 0x0347 0x0676 0x01bf 0x0070 0xff7b 0xffaf 
+.short 0xffc1 0xfd5e 0xfcc4 0x018d 0x01ba 0xfdec 0x008e 0x0304 

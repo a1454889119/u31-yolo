@@ -1,0 +1,51 @@
+#include layer_io_size.upinc
+#include memory_layout.upinc
+#include upsample.upinc
+#include conv1.upinc
+
+@import conv1_144_36
+@import conv1_96_36
+
+@import tmp_rp_adr0
+
+#define GROUP17_A (IO_ADR + 13440)
+#define GROUP17_B (IO_ADR + 26880)
+#define GROUP17_C (IO_ADR + 53760)
+#define GROUP17_D (IO_ADR + 33600)
+#define GROUP17_E (IO_ADR + 8400)
+
+@export group17
+group17:
+	sv tmp_rp_adr0 rp
+
+	lcs conv1_w 10
+	lcs conv1_h 7
+	// 输入96通道, 输出36通道
+	lcs conv1_in_stride 192
+	lcs conv1_out_stride 72
+	lc conv1_in_adr, GROUP17_A
+	lc conv1_out_adr, GROUP17_E
+	lc conv1_kernel_adr, LAYER_108_KERNEL_ADDR
+	lc conv1_bias_adr, LAYER_108_BIAS_ADDR	
+	call conv1_96_36
+	
+	lcs upsample_in_w 10
+	lcs upsample_in_h 7
+	lc upsample_in_adr, GROUP17_A
+	lc merge_in_adr, GROUP17_B
+	lc upsample_out_adr, GROUP17_C
+	call upsample_merge
+
+	lcs conv1_w 20
+	lcs conv1_h 14
+	// 输入144通道, 输出36通道
+	lcs conv1_in_stride 288
+	lcs conv1_out_stride 72
+	lc conv1_in_adr, GROUP17_C
+	lc conv1_out_adr, GROUP17_D
+	lc conv1_kernel_adr, LAYER_93_KERNEL_ADDR
+	lc conv1_bias_adr, LAYER_93_BIAS_ADDR	
+	call conv1_144_36
+
+	lv rp tmp_rp_adr0
+	ret

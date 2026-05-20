@@ -1,0 +1,51 @@
+#define __file_mem__ 1
+
+#if 1
+// 内存比较 每次比较4字节, 不相等时返回0, 相等返回1
+$func memcmp(in addr1, in addr2, in len, out reg_result) {
+    reg x0 x1 x2 x3 x4
+    $push_regs ptr4
+    nop
+    load_reg x0 addr1
+    load_reg x1 addr2
+    load_reg x2 len
+
+    whiles x2 > 0 {
+        lw x3 x0
+        lw x4 x1
+        sub x3 x3 x4
+        ifu x3 != 0 {
+            lc x1 0
+            $pop_regs ptr4
+            set_var reg_result x1
+            return
+        }
+
+        inc x0 4
+        inc x1 4
+        sub x2 x2 4
+    }
+
+    $pop_regs ptr4
+    lc x1 1
+    set_var reg_result x1
+    nop
+}
+
+// 内存设置 每次设置4字节
+$func memset(in addr, in value, in len) {
+    reg x1 x2 x3
+    $push_regs ptr4
+    nop
+    load_reg ptr4 addr
+    load_reg x2 value
+    load_reg x3 len
+
+    whiles x3 > 0 {
+        sw ptr4 x2
+        sub x3 x3 4
+    }
+    $pop_regs ptr4
+}
+
+#endif

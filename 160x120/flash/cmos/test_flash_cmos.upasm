@@ -1,0 +1,65 @@
+
+#include layer_memory.upinc
+
+#define reg_spi_buf 0x0900050c
+/*
+[31:24]  spi_cmd       //SPI指令码,发送纯数据指令码为0
+[23]     spi_wr        //1:write, 0:read  
+[18:0]   spi_dat_num   //SPI每次读/写的字节数，最大为内存大小  
+*/
+#define reg_spi_cmd 0x09000510
+
+@import init_cmos_bf3901
+@import IMAGE_INPUT_ADDR0
+@import IMAGE_INPUT_ADDR1
+$func transpos_120x160_padzeros(in input, in output)
+$func yolo_run(in image_adr)
+
+$func spi_write_frame(in frame_adr)
+$func spi_write_result()
+$func copy_frame(in input, in output)
+entry:
+	// spi_init
+	svw 0x09000500,0x12000
+	svw 0x09000504,0x103
+	//key init,用于跟PC同步
+    svw 0x09000a58,1
+    svw 0x09000a54,8000
+    svw 0x09000b00,1
+    svw 0x09000b0c,0
+
+	call init_cmos_bf3901
+
+loop:
+	svw 0x09000044 0x4
+	nop
+	hlt 2
+
+
+    lvw r1 0x0900022c // r1=当前图像地址
+    lc r0 IMAGE_INPUT_ADDR0
+    svw 0x09000210 IMAGE_INPUT_ADDR0
+    ifu r1 == r0 { //双缓存切换
+        svw 0x09000210 IMAGE_INPUT_ADDR1 
+    }
+	wait_key
+	cache_clr
+
+	copy_frame(r1, IMAGE_ADDR)
+	spi_write_frame(IMAGE_ADDR)
+	// 转置, 120x160->160x120
+	transpos_120x160_padzeros(r1, IMAGE_ADDR)
+
+	// 运行yolo
+	yolo_run(IMAGE_PAD_START)
+	spi_write_result()
+
+	//lcs r2, 19200 - 16
+	//lm s15 r1 r2
+	//hlt 0x1fffff
+	//hlt 0x1fffff
+	//hlt 0x1fffff
+	//hlt 0x1fffff
+	//lm s14 r1 r2
+
+	jmp loop

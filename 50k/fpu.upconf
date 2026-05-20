@@ -1,0 +1,86 @@
+#define RAM_SIZE       262144 //内存大小，字节
+#define SP_SIZE        64     //堆栈大小，字节
+
+#define GEN_X_CORDIC   0   //1:生成cordic参数
+
+#define FIFO0_MODE     1    //2:32bit  1:16bit, length_max = 1536
+#define FIFO0_LENGTH   0 
+				    
+#define FIFO1_MODE     1    //2:32bit  1:16bit 
+#define FIFO1_LENGTH   0  
+				    
+#define FIFO2_MODE     1    //2:32bit  1:16bit 
+#define FIFO2_LENGTH   0  
+				    
+#define FIFO3_MODE     1    //2:32bit  1:16bit 
+#define FIFO3_LENGTH   0  
+				    
+#define FIFO4_MODE     1    //2:32bit  1:16bit 
+#define FIFO4_LENGTH   0  
+				    
+#define FIFO5_MODE     1    //2:32bit  1:16bit 
+#define FIFO5_LENGTH   0  
+				    
+#define FIFO6_MODE     1    //2:32bit  1:16bit 
+#define FIFO6_LENGTH   0  
+				    
+#define FIFO7_MODE     1    //2:32bit  1:16bit 
+#define FIFO7_LENGTH   0  
+				    
+#define FIFO8_MODE     1    //2:32bit  1:16bit //pwm
+#define FIFO8_LENGTH   0   
+				    
+#define FIFO9_MODE     1    //2:32bit  1:16bit //I2S_OUT1
+#define FIFO9_LENGTH   0   
+				    
+#define FIFO10_MODE    1    //2:32bit  1:16bit //I2S_OUT2
+#define FIFO10_LENGTH  0   
+				    
+#define FIFO11_MODE    1    //2:32bit  1:16bit //I2S_OUT3
+#define FIFO11_LENGTH  0   
+				    
+#define FIFO12_MODE    1    //2:32bit  1:16bit //I2S_OUT4
+#define FIFO12_LENGTH  0   
+				    
+#define FIFO13_MODE    1    //2:32bit  1:16bit 
+#define FIFO13_LENGTH  0   
+				    
+#define FIFO14_MODE    1    //2:32bit  1:16bit 
+#define FIFO14_LENGTH  0   
+
+#define FIFO15_MODE    1    //2:32bit  1:16bit 
+#define FIFO15_LENGTH  0  
+
+#define FFT_CHANNELS   0
+#define FFT_N          0
+						   
+#define IMG1_EN          0     //1:启用 0:关闭
+#define IMG1_WIDTH       640   //max 640
+#define IMG1_HEIGH       480   //max 480
+#define IMG1_RAM_SEL     0     //1:psram 0:ram
+#define IMG1_FIFO_LENGTH 2048  //byte size 
+
+#define IMG2_EN          0     //1:启用 0:关闭
+#define IMG2_WIDTH       640   //max 640
+#define IMG2_HEIGH       480   //max 480
+#define IMG2_RAM_SEL     0     //1:psram 0:ram
+#define IMG2_FIFO_LENGTH 0    //byte size 
+
+#define VDMA1_FIFO_EN     1     //only for read imge from psram 
+#define VDMA1_FIFO_LENGTH 8192  //only for read imge from psram
+
+#define IMG_OUT_FIFO_EN     0     //only for imge out from psram 
+#define IMG_OUT_FIFO_LENGTH 0  //only for imge out from psram
+
+#define PSRAM_ADR_START 0
+
+#define cordic_iteration 16
+
+
+
+
+
+
+
+
+

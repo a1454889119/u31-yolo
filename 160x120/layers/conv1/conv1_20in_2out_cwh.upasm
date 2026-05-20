@@ -1,0 +1,67 @@
+#define bb d0
+#define b0 d0_lo
+#define b1 d0_hi
+
+#define k0_0 s0
+#define k0_1 s1
+#define k0_2 d1
+
+#define k1_0 s2
+#define k1_1 s3
+#define k1_2 d2
+
+#define in_0 s5
+#define in_1 s6
+#define in_2 d3
+
+#define outptr ptr0
+#define inptr ptr1
+#define kptr ptr2
+#define bptr ptr3
+
+$func conv1_20in_2out_linear_cwh(in input, in output, in kernels, in width_x_height, in outstride) {
+	reg i, j, wxh, badr, outs
+	reg rj0, rj1
+	nop
+	load_reg kptr kernels
+	load_reg inptr input
+	load_reg outptr output
+	load_reg wxh width_x_height
+	load_reg outs outstride
+
+	lm_d   k0_0 kptr
+	lm_d   k0_1 kptr
+	l64_d  k0_2 kptr
+	lm_d   k1_0 kptr
+	lm_d   k1_1 kptr
+	l64_d  k1_2 kptr
+	mov badr kptr
+	
+	sub outs outs 4
+	lcs i 0
+	$jump_regs rj0 rj1
+	whileu i < wxh {
+		l64_d bb badr
+		lm_d in_0 inptr
+		lm_d in_1 inptr
+		l64_d in_2 inptr
+
+		simd_mac16_8 b0 k0_0 in_0
+		simd_mac16_8 b1 k1_0 in_0
+		simd_mac16_8 b0 k0_1 in_1
+		simd_mac16_8 b1 k1_1 in_1
+		simd_mac16_4 b0 k0_2 in_2
+		simd_mac16_4 b1 k1_2 in_2
+
+		srs b0 b0 10
+		srs b1 b1 10
+
+		ssl outptr b0
+		ssl outptr b1
+		
+		inc outptr outs
+		inc i 1
+	}
+	$jump_regs end
+
+}

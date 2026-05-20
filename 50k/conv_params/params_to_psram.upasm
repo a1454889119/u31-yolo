@@ -1,0 +1,44 @@
+@import layer_0_input
+@import init_psram
+
+
+
+
+/*
+0x09000608  
+[23:0]   spi_periph_adr  SPI从设备地址 
+0x0900060c  
+[16:0]   spi_ram_buf_adr SPI设备读、写数据缓存地址, 需要4字节对齐  
+0x09000610
+[31:24]  spi_cmd       //SPI指令码, 写0x09000510启动一次读、写  
+[23]     spi_wr        //1:write, RAM到PSRAM 0:read, PSRAM到RAM  
+[18:0]   spi_dat_num   //SPI每次读/写的字节数（需要是偶数），最大为内存大小
+*/
+
+#var PARAM_PSRAM_WRITE 0
+#set_bits PARAM_PSRAM_WRITE, 31, 24, 0x80)	//write: 0x80; read: 0x00
+#set_bits PARAM_PSRAM_WRITE, 23, 23, 1)		//1:write,RAM到PSRAM 0:read, PSRAM到RAM  
+#set_bits PARAM_PSRAM_WRITE, 18, 0, 46464)	//SPI每次读/写的字节数（需要是偶数），最大为内存大小
+
+
+#var PARAM_PSRAM_READ 0
+#set_bits PARAM_PSRAM_READ, 31, 24, 0x00)		//write: 0x80; read: 0x00
+#set_bits PARAM_PSRAM_READ, 23, 23, 0)		//1:write,RAM到PSRAM 0:read, PSRAM到RAM  
+#set_bits PARAM_PSRAM_READ, 18, 0, 46464)		//SPI每次读/写的字节数（需要是偶数），最大为内存大小
+
+
+entry:
+	call init_psram
+	
+	svw 0x09000608 CONV_PARAM_PSRAM_ADDR
+	svw 0x0900060c layer_0_input
+	svw 0x09000610 PARAM_PSRAM_WRITE
+	hlt 7
+
+	svw 0x09000608 CONV_PARAM_PSRAM_ADDR
+	svw 0x0900060c layer_0_input
+	svw 0x09000610 PARAM_PSRAM_READ
+	hlt 7
+
+	nop
+	ret

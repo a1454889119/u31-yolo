@@ -1,0 +1,35 @@
+//---------------LAYER 20(conv)-------------
+//input:22x11x24
+//output:22x11x8
+//k1s1p0,group=1
+//linear
+
+#include "layers_common.upinc"
+
+
+@import conv_k1_i24o8_params
+@import conv_k1_i24o8_cwh
+
+@export layer_20
+layer_20:
+	sv layer_rp_adr0 rp
+	//conv_k1_i24o8_params:
+	//.word 0 // input_adr
+	//.word 0 // input_end
+	//.word 0 // kernel_adr
+	//.word 0 // bias_adr
+	//.word 0 // output_adr
+	lcs ptr0 conv_k1_i24o8_params
+	lcs t0 layer_19_output
+	lcs t1 LAYER_19_OUTPUT_SIZE
+
+	sw ptr0 t0
+	inc t1 t0
+	sw ptr0 t1
+	sw  ptr0 kernel_addr
+	sw  ptr0 bias_addr
+	svw ptr0 layer_20_output
+	call conv_k1_i24o8_cwh
+	
+	lv rp layer_rp_adr0
+	ret

@@ -1,0 +1,8 @@
+@import LAYER_51_OUTPUT
+@import LAYER_52_OUTPUT
+
+$func global_avg_pool_40x30(in input, in output, in channels)
+
+entry:
+	global_avg_pool_40x30(LAYER_51_OUTPUT, LAYER_52_OUTPUT, 24)
+	hlt

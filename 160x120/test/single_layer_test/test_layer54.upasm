@@ -1,0 +1,10 @@
+@import LAYER_51_OUTPUT
+@import LAYER_53_OUTPUT
+@import LAYER_54_OUTPUT
+
+$func mul_40x30_whc(in input0, in input1, in output, in channels)
+
+entry:
+	mul_40x30_whc(LAYER_51_OUTPUT, LAYER_53_OUTPUT, LAYER_54_OUTPUT, 24)
+
+	hlt

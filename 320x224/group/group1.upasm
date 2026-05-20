@@ -1,0 +1,55 @@
+#include layer_io_size.upinc
+#include memory_layout.upinc
+#include conv1.upinc
+#include dwconv.upinc
+
+@import conv1_12_16
+@import conv1_8_12
+@import dwconv3
+@import tmp_rp_adr0
+
+#define GROUP1_A (IO_ADR + 0)
+#define GROUP1_B (IO_ADR + LAYER_1_OUTPUT_SIZE)
+#define GROUP1_C (IO_ADR + LAYER_4_OUTPUT_SIZE)
+
+
+
+@export group1
+group1:
+	sv tmp_rp_adr0 rp
+
+	lcs conv1_w 80
+	lcs conv1_h 56
+	// 输入8通道, 输出12通道
+	lcs conv1_in_stride 16
+	lcs conv1_out_stride 24
+	lc conv1_in_adr, GROUP1_A
+	lc conv1_out_adr, GROUP1_B
+	lc conv1_bias_adr, LAYER_2_BIAS_ADDR
+	lc conv1_kernel_adr, LAYER_2_KERNEL_ADDR
+	call conv1_8_12
+
+	lcs dwconv_out_w 40
+	lcs dwconv_out_h 28
+	lcs dwconv_in_w 80
+	lcs dwconv_in_h 56
+	lcs dwconv_c 12
+	lc  dwconv_in_adr, GROUP1_B
+	lc  dwconv_out_adr, GROUP1_C
+	lc  dwconv_bias_adr, LAYER_3_BIAS_ADDR
+	lc  dwconv_kernel_adr, LAYER_3_KERNEL_ADDR
+	call dwconv3
+
+	lcs conv1_w 40
+	lcs conv1_h 28
+	// 输入12通道, 输出16通道
+	lcs conv1_in_stride 24
+	lcs conv1_out_stride, 32
+	lc conv1_in_adr, GROUP1_C
+	lc conv1_out_adr, GROUP1_A
+	lc conv1_bias_adr, LAYER_4_BIAS_ADDR
+	lc conv1_kernel_adr, LAYER_4_KERNEL_ADDR
+	call conv1_12_16
+
+	lv rp tmp_rp_adr0
+	ret

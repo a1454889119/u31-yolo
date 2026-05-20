@@ -1,0 +1,114 @@
+#include 160x120_weights.upinc
+#include layer_memory.upinc
+#include yolo_funcs.upinc
+
+#if ENABLE_CHECK_COST
+#define CHECK_COST lvw r0 0x09000040; svw 0x09000040 3; 
+#else
+#define CHECK_COST
+#endif
+// 根据图像采集的时机把整个模型的运行划分成2个部分
+// 图像采集在2个部分的中间进行
+
+$func yolo_run_part1() {
+	// 0~3
+	conv3s2_1in_8out_cwh(IMAGE_PAD_START, LAYER_0_OUTPUT_CWH, layer0_kernel, 80 * 60); CHECK_COST
+	conv1_8in_8out_whc(LAYER_0_OUTPUT_CWH, LAYER_1_OUTPUT_WHC, layer1_kernel, 80 * 60); CHECK_COST
+	conv3s2_linear_cwh(LAYER_1_OUTPUT_WHC, LAYER_2_OUTPUT_CWH, 8, layer2_kernel, 40, 30); CHECK_COST
+	conv1_8in_24out_cwh(LAYER_2_OUTPUT_CWH, LAYER_3_OUTPUT_CWH, layer3_kernel, 40 * 30, 96); CHECK_COST
+	// 4~7
+	conv1_12in_12out_whc(LAYER_3_OUTPUT_CWH + 24, LAYER_4_OUTPUT_WHC, layer4_kernel, 40 * 30, 96); CHECK_COST
+	conv3s1_leaky_cwh(LAYER_4_OUTPUT_WHC, LAYER_5_OUTPUT_CWH, 12, layer5_kernel, 40, 30, 24); CHECK_COST
+	conv1_12in_12out_whc(LAYER_5_OUTPUT_CWH, LAYER_6_OUTPUT_WHC, layer6_kernel, 40 * 30, 24); CHECK_COST
+	conv3s1_leaky_cwh(LAYER_6_OUTPUT_WHC, LAYER_7_OUTPUT_CWH, 12, layer7_kernel, 40, 30, 96); CHECK_COST
+	// 8~12
+	conv1_12in_12out_whc(LAYER_7_OUTPUT_CWH, LAYER_8_OUTPUT_WHC, layer8_kernel, 40 * 30, 96); CHECK_COST
+	conv3s1_leaky_cwh(LAYER_8_OUTPUT_WHC, LAYER_9_OUTPUT_CWH, 12, layer9_kernel, 40, 30, 24); CHECK_COST
+	conv1_12in_12out_whc(LAYER_9_OUTPUT_CWH, LAYER_10_OUTPUT_WHC, layer10_kernel, 40 * 30, 24); CHECK_COST
+	conv3s1_leaky_cwh(LAYER_10_OUTPUT_WHC, LAYER_11_OUTPUT_CWH, 12, layer11_kernel, 40, 30, 96); CHECK_COST
+	conv1_48in_8nout_whc(LAYER_12_INPUT_CWH, LAYER_12_OUTPUT_WHC, 3, layer12_kernel, 40*30); CHECK_COST
+	
+	// 13~15
+	conv3s2_leaky_cwh(LAYER_12_OUTPUT_WHC, LAYER_13_OUTPUT_WHC, 24, layer13_kernel, 20, 15); CHECK_COST
+	conv1_24inout_cwh(LAYER_13_OUTPUT_WHC, LAYER_14_OUTPUT_CWH, layer14_kernel, 20 * 15, 48); CHECK_COST
+	conv1_24inout_cwh(LAYER_14_OUTPUT_CWH, LAYER_15_OUTPUT_CWH, layer15_kernel_p0, 20 * 15, 240)
+	conv1_24inout_cwh(LAYER_14_OUTPUT_CWH, LAYER_15_OUTPUT_CWH + 48, layer15_kernel_p1, 20 * 15, 240); CHECK_COST
+	// 16~19
+	conv1_24inout_whc(LAYER_15_OUTPUT_CWH + 48, LAYER_16_OUTPUT_WHC, layer16_kernel, 20 * 15, 240); CHECK_COST
+	conv3s1_leaky_cwh(LAYER_16_OUTPUT_WHC, LAYER_17_OUTPUT_CWH, 24, layer17_kernel, 20, 15, 48); CHECK_COST
+	conv1_24inout_whc(LAYER_17_OUTPUT_CWH, LAYER_18_OUTPUT_WHC, layer18_kernel, 20 * 15, 48); CHECK_COST
+	conv3s1_leaky_cwh(LAYER_18_OUTPUT_WHC, LAYER_19_OUTPUT_CWH, 24, layer19_kernel, 20, 15, 240); CHECK_COST
+	// 20~23
+	conv1_24inout_whc(LAYER_19_OUTPUT_CWH, LAYER_20_OUTPUT_WHC, layer20_kernel, 20 * 15, 240); CHECK_COST
+	conv3s1_leaky_cwh(LAYER_20_OUTPUT_WHC, LAYER_21_OUTPUT_CWH, 24, layer21_kernel, 20, 15, 48); CHECK_COST
+	conv1_24inout_whc(LAYER_21_OUTPUT_CWH, LAYER_22_OUTPUT_WHC, layer22_kernel, 20 * 15, 48); CHECK_COST
+	conv3s1_leaky_cwh(LAYER_22_OUTPUT_WHC, LAYER_23_OUTPUT_CWH, 24, layer23_kernel, 20, 15, 240); CHECK_COST
+	// 24~28
+	conv1_24inout_whc(LAYER_23_OUTPUT_CWH, LAYER_24_OUTPUT_WHC, layer24_kernel, 20 * 15, 240); CHECK_COST
+	conv3s1_leaky_cwh(LAYER_24_OUTPUT_WHC, LAYER_25_OUTPUT_CWH, 24, layer25_kernel, 20, 15, 48); CHECK_COST
+	conv1_24inout_whc(LAYER_25_OUTPUT_CWH, LAYER_26_OUTPUT_WHC, layer26_kernel, 20 * 15, 48); CHECK_COST
+	conv3s1_leaky_cwh(LAYER_26_OUTPUT_WHC, LAYER_27_OUTPUT_CWH, 24, layer27_kernel, 20, 15, 240); CHECK_COST
+	conv1_120in_48out_cwh(LAYER_28_INPUT_CWH, LAYER_28_OUTPUT_CWH, layer28_kernel, 20 * 15); CHECK_COST
+
+	// 29~33
+	conv1_48in_8nout_whc_cwh(LAYER_28_OUTPUT_CWH, LAYER_29_OUTPUT_WHC, LAYER_29_OUTPUT_CWH, 3, layer29_kernel, 20*15, 192); CHECK_COST
+	maxpool5_whc_cwh(LAYER_29_OUTPUT_WHC, LAYER_30_OUTPUT_WHC, LAYER_30_OUTPUT_CWH, 20, 15, 24, 192); CHECK_COST
+	maxpool5_whc_cwh(LAYER_30_OUTPUT_WHC, LAYER_31_OUTPUT_WHC, LAYER_31_OUTPUT_CWH, 20, 15, 24, 192); CHECK_COST
+	maxpool5_cwh(LAYER_31_OUTPUT_WHC, LAYER_32_OUTPUT_CWH, 20, 15, 24, 192); CHECK_COST
+	conv1_96in_48out_whc(LAYER_33_INPUT_CWH, LAYER_33_OUTPUT_WHC, layer33_kernel, 20*15); CHECK_COST
+	// 34~38
+	conv3s1x2_leaky_cwh(LAYER_33_OUTPUT_WHC, LAYER_34_OUTPUT_CWH, LAYER_34_TEMP_CHANNEL, 24, layer34_kernel, 20, 15); CHECK_COST
+	conv1_24inout_whc(LAYER_34_OUTPUT_CWH, LAYER_35_OUTPUT_WHC, layer35_kernel, 20 * 15, 48); CHECK_COST
+	global_avg_pool_20x15(LAYER_35_OUTPUT_WHC, LAYER_36_OUTPUT_CWH, 24); CHECK_COST
+	conv1_24inout_1x1_sigmoid(LAYER_36_OUTPUT_CWH, LAYER_37_OUTPUT_CWH, layer37_kernel); CHECK_COST
+	mul_20x15_whc(LAYER_35_OUTPUT_WHC, LAYER_37_OUTPUT_CWH, LAYER_38_OUTPUT_WHC, 24); CHECK_COST
+	
+	// 39~43
+	conv3s1_leaky_cwh(LAYER_38_OUTPUT_WHC, LAYER_39_OUTPUT_CWH, 24, layer39_kernel, 20, 15, 48); CHECK_COST
+	conv1_24in_20out_linear_whc(LAYER_39_OUTPUT_CWH, LAYER_40_OUTPUT_WHC, layer40_kernel, 20*15); CHECK_COST
+	conv3s1_leaky_cwh(LAYER_40_OUTPUT_WHC, LAYER_41_OUTPUT_CWH, 20, layer41_kernel, 20, 15, 40); CHECK_COST
+	conv1_20in_20out_linear_cwh(LAYER_41_OUTPUT_CWH, LAYER_42_OUTPUT_WHC, layer42_kernel, 20*15, 40); CHECK_COST
+	conv1_20in_2out_linear_cwh(LAYER_42_OUTPUT_WHC, LAYER_43_OUTPUT_CWH, layer43_kernel, 20*15, 4); CHECK_COST
+	// 44~48
+	conv3s1_leaky_cwh(LAYER_38_OUTPUT_WHC, LAYER_44_OUTPUT_CWH, 24, layer44_kernel, 20, 15, 48); CHECK_COST
+	conv1_24in_20out_linear_whc(LAYER_44_OUTPUT_CWH, LAYER_45_OUTPUT_WHC, layer45_kernel, 20*15); CHECK_COST
+	conv3s1_leaky_cwh(LAYER_45_OUTPUT_WHC, LAYER_46_OUTPUT_CWH, 20, layer46_kernel, 20, 15, 40); CHECK_COST
+	conv1_20in_20out_linear_cwh(LAYER_46_OUTPUT_CWH, LAYER_47_OUTPUT_WHC, layer47_kernel, 20*15, 40); CHECK_COST
+	conv1_20in_20out_linear_cwh(LAYER_47_OUTPUT_WHC, LAYER_48_OUTPUT_CWH, layer48_kernel_p0, 20*15, 80)
+	conv1_20in_20out_linear_cwh(LAYER_47_OUTPUT_WHC, LAYER_48_OUTPUT_CWH + 40, layer48_kernel_p1, 20*15, 80); CHECK_COST
+
+	// 解析第一部分
+	yolo_reset();
+	yolo(LAYER_48_OUTPUT_CWH, LAYER_43_OUTPUT_CWH, 20, 15, 8); CHECK_COST
+
+	// 49~54
+	upsample_whc(LAYER_38_OUTPUT_WHC, LAYER_49_OUTPUT_WHC, 20, 15, 24); CHECK_COST
+	conv3s1x2_leaky_cwh(LAYER_49_OUTPUT_WHC, LAYER_50_OUTPUT_CWH, LAYER_50_TEMP_CHANNEL, 24, layer50_kernel, 40, 30); CHECK_COST
+	conv1_24inout_whc(LAYER_50_OUTPUT_CWH, LAYER_51_OUTPUT_WHC, layer51_kernel, 40 * 30, 48); CHECK_COST
+	global_avg_pool_40x30(LAYER_51_OUTPUT_WHC, LAYER_52_OUTPUT_CWH, 24); CHECK_COST
+	conv1_24inout_1x1_sigmoid(LAYER_52_OUTPUT_CWH, LAYER_53_OUTPUT_CWH, layer53_kernel); CHECK_COST
+	mul_40x30_whc(LAYER_51_OUTPUT_WHC, LAYER_53_OUTPUT_CWH, LAYER_54_OUTPUT_WHC, 24); CHECK_COST
+
+	// 55~59
+	conv3s1_leaky_cwh(LAYER_54_OUTPUT_WHC, LAYER_55_OUTPUT_CWH, 24, layer55_kernel, 40, 30, 48); CHECK_COST
+	conv1_24in_20out_linear_whc(LAYER_55_OUTPUT_CWH, LAYER_56_OUTPUT_WHC, layer56_kernel, 40*30); CHECK_COST
+	conv3s1_leaky_cwh(LAYER_56_OUTPUT_WHC, LAYER_57_OUTPUT_CWH, 20, layer57_kernel, 40, 30, 40); CHECK_COST
+	conv1_20in_20out_linear_cwh(LAYER_57_OUTPUT_CWH, LAYER_58_OUTPUT_CWH, layer58_kernel, 40*30, 40); CHECK_COST
+	conv1_20in_2out_linear_cwh(LAYER_58_OUTPUT_CWH, LAYER_59_OUTPUT_CWH, layer59_kernel, 40*30, 4); CHECK_COST
+	// 60~64
+	conv3s1_leaky_cwh(LAYER_54_OUTPUT_WHC, LAYER_60_OUTPUT_CWH, 24, layer60_kernel, 40, 30, 48); CHECK_COST
+	nop
+}
+
+$func yolo_run_part2() {
+	conv1_24in_20out_linear_whc(LAYER_60_OUTPUT_CWH, LAYER_61_OUTPUT_WHC, layer61_kernel, 40*30); CHECK_COST
+	conv3s1_leaky_cwh(LAYER_61_OUTPUT_WHC, LAYER_62_OUTPUT_CWH, 20, layer62_kernel, 40, 30, 40); CHECK_COST
+	
+	conv1_20in_20out_linear_cwh(LAYER_62_OUTPUT_CWH, LAYER_63_OUTPUT_CWH, layer63_kernel, 40*30, 40); CHECK_COST
+	conv1_20in_20out_linear_cwh(LAYER_63_OUTPUT_CWH, LAYER_64_OUTPUT_CWH, layer64_kernel_p0, 40*30, 80)
+	conv1_20in_20out_linear_cwh(LAYER_63_OUTPUT_CWH, LAYER_64_OUTPUT_CWH + 40, layer64_kernel_p1, 40*30, 80); CHECK_COST
+
+	// 解析第二部分
+	yolo(LAYER_64_OUTPUT_CWH, LAYER_59_OUTPUT_CWH, 40, 30, 4); CHECK_COST
+	nop
+}

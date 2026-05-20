@@ -1,0 +1,23 @@
+#include maxpool.upinc
+
+@import init_psram
+@import maxpool
+
+maxp_out_data:
+.reserve 80*56*8*2
+
+
+entry:
+	call init_psram
+	
+	lc r30,0x09000040
+	sw r30,3
+
+	lc maxp_in_adr PSRAM_LAYER_0_OUTPUT
+	lc maxp_out_adr maxp_out_data
+	call maxpool
+
+	lc r30,0x09000040
+	lw r31,r30
+	
+	hlt

@@ -1,0 +1,8 @@
+@import LAYER_13_OUTPUT
+@import LAYER_14_OUTPUT
+@import layer14_kernel
+$func conv1_24inout_cwh(in input, in output, in kernels, in width_x_height, in outstride)
+
+entry:
+	conv1_24inout_cwh(LAYER_13_OUTPUT, LAYER_14_OUTPUT, layer14_kernel, 20 * 15, 48)
+	hlt

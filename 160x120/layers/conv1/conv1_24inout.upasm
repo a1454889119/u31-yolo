@@ -1,0 +1,329 @@
+#define b_03 s4
+#define b0 s4_0
+#define b1 s4_1
+#define b2 s4_2
+#define b3 s4_3
+
+#define k0_0 s0
+#define k0_1 s1
+#define k0_2 s2
+#define k1_0 s5
+#define k1_1 s6
+#define k1_2 s7
+#define k2_0 s8
+#define k2_1 s9
+#define k2_2 s10
+
+#define in_0 s11
+#define in_1 s12
+#define in_2 s13
+
+#define outptr ptr0
+#define inptr ptr1
+#define kptr ptr2
+#define bptr ptr3
+
+$func conv1_24inout_cwh(in input, in output, in kernels, in width_x_height, in outstride) {
+	reg i, j, wxh, bstart, kadr, outs
+	reg rj0, rj1
+	nop
+	load_reg kadr kernels
+	load_reg inptr input
+	load_reg outptr output
+	load_reg wxh width_x_height
+	load_reg outs outstride
+
+	sub outs outs 48
+	lcs bstart, 24*24*2
+	inc bstart kadr
+	lcs i 0
+	$jump_regs rj0
+	whileu i < wxh {
+		lm_d in_0 inptr
+		lm_d in_1 inptr
+		lm_d in_2 inptr
+
+		mov bptr bstart
+		mov kptr kadr
+
+		lcs j 0
+		whileu j < 3 {
+			lm_d  b_03 bptr
+			lm_d  k0_0 kptr
+			lm_d  k0_1 kptr
+			lm_d  k0_2 kptr
+			lm_d  k1_0 kptr
+			lm_d  k1_1 kptr
+			lm_d  k1_2 kptr
+			lm_d  k2_0 kptr
+			lm_d  k2_1 kptr
+			lm_d  k2_2 kptr
+			simd_mac16_8 b0 k0_0 in_0
+			lm_d  k0_0 kptr
+			simd_mac16_8 b3 k0_0 in_0
+			simd_mac16_8 b1 k1_0 in_0
+			simd_mac16_8 b2 k2_0 in_0
+
+			simd_mac16_8 b0 k0_1 in_1
+			lm_d  k0_1 kptr
+			simd_mac16_8 b3 k0_1 in_1
+			simd_mac16_8 b1 k1_1 in_1
+			simd_mac16_8 b2 k2_1 in_1
+
+			simd_mac16_8 b0 k0_2 in_2
+			lm_d  k0_2 kptr
+			simd_mac16_8 b3 k0_2 in_2
+			simd_mac16_8 b1 k1_2 in_2
+			simd_mac16_8 b2 k2_2 in_2
+
+			lm_d  k0_0 kptr
+			lm_d  k0_1 kptr
+			lm_d  k0_2 kptr
+			simd_leaky d0 b_03 10
+
+			lm_d  b_03 bptr
+			lm_d  k1_0 kptr
+			lm_d  k1_1 kptr
+			lm_d  k1_2 kptr
+			lm_d  k2_0 kptr
+			lm_d  k2_1 kptr
+			lm_d  k2_2 kptr
+			simd_mac16_8 b0 k0_0 in_0
+			lm_d  k0_0 kptr
+			simd_mac16_8 b3 k0_0 in_0
+			simd_mac16_8 b1 k1_0 in_0
+			simd_mac16_8 b2 k2_0 in_0
+
+			simd_mac16_8 b0 k0_1 in_1
+			lm_d  k0_1 kptr
+			simd_mac16_8 b3 k0_1 in_1
+			simd_mac16_8 b1 k1_1 in_1
+			simd_mac16_8 b2 k2_1 in_1
+
+			simd_mac16_8 b0 k0_2 in_2
+			lm_d  k0_2 kptr
+			simd_mac16_8 b3 k0_2 in_2
+			simd_mac16_8 b1 k1_2 in_2
+			simd_mac16_8 b2 k2_2 in_2
+
+			s64 outptr d0
+			inc j 1
+
+			simd_leaky d0 b_03 10
+			nop
+			s64 outptr d0
+		}
+		inc outptr outs
+		inc i 1
+	}
+	$jump_regs end
+	
+}
+
+$func conv1_24inout_whc(in input, in output, in kernels, in width_x_height, in instride) {
+	reg i, j, wxh, bstart, kadr, outadr, ins
+	reg rj0, rj1
+	nop
+	load_reg kadr kernels
+	load_reg inptr input
+	load_reg outadr output
+	load_reg wxh width_x_height
+	load_reg ins instride
+
+	sub ins ins 48
+	// 设置ptr0偏移值为wxh*2
+	add i wxh wxh
+	lc j 0x10000
+	or i i j
+	svw 0x09000058, i
+
+	lcs bstart, 24*24*2
+	inc bstart kadr
+	lcs i 0
+	$jump_regs rj0
+	whileu i < wxh {
+		lm_d in_0 inptr
+		lm_d in_1 inptr
+		lm_d in_2 inptr
+
+		mov bptr bstart
+		mov kptr kadr
+		mov outptr outadr
+		lcs j 0
+		whileu j < 3 {
+			lm_d  b_03 bptr
+			lm_d  k0_0 kptr
+			lm_d  k0_1 kptr
+			lm_d  k0_2 kptr
+			lm_d  k1_0 kptr
+			lm_d  k1_1 kptr
+			lm_d  k1_2 kptr
+			lm_d  k2_0 kptr
+			lm_d  k2_1 kptr
+			lm_d  k2_2 kptr
+			simd_mac16_8 b0 k0_0 in_0
+			lm_d  k0_0 kptr
+			simd_mac16_8 b3 k0_0 in_0
+			simd_mac16_8 b1 k1_0 in_0
+			simd_mac16_8 b2 k2_0 in_0
+
+			simd_mac16_8 b0 k0_1 in_1
+			lm_d  k0_1 kptr
+			simd_mac16_8 b3 k0_1 in_1
+			simd_mac16_8 b1 k1_1 in_1
+			simd_mac16_8 b2 k2_1 in_1
+
+			simd_mac16_8 b0 k0_2 in_2
+			lm_d  k0_2 kptr
+			simd_mac16_8 b3 k0_2 in_2
+			simd_mac16_8 b1 k1_2 in_2
+			simd_mac16_8 b2 k2_2 in_2
+
+			lm_d  k0_0 kptr
+			lm_d  k0_1 kptr
+			lm_d  k0_2 kptr
+			simd_leaky d0 b_03 10
+
+			lm_d  b_03 bptr
+			lm_d  k1_0 kptr
+			lm_d  k1_1 kptr
+			lm_d  k1_2 kptr
+			lm_d  k2_0 kptr
+			lm_d  k2_1 kptr
+			lm_d  k2_2 kptr
+			simd_mac16_8 b0 k0_0 in_0
+			lm_d  k0_0 kptr
+			simd_mac16_8 b3 k0_0 in_0
+			simd_mac16_8 b1 k1_0 in_0
+			simd_mac16_8 b2 k2_0 in_0
+
+			simd_mac16_8 b0 k0_1 in_1
+			lm_d  k0_1 kptr
+			simd_mac16_8 b3 k0_1 in_1
+			simd_mac16_8 b1 k1_1 in_1
+			simd_mac16_8 b2 k2_1 in_1
+
+			simd_mac16_8 b0 k0_2 in_2
+			lm_d  k0_2 kptr
+			simd_mac16_8 b3 k0_2 in_2
+			simd_mac16_8 b1 k1_2 in_2
+			simd_mac16_8 b2 k2_2 in_2
+
+			ssl outptr d0_lo
+			ss  outptr d0_lo
+			ssl outptr d0_hi
+			ss  outptr d0_hi
+
+			simd_leaky d0 b_03 10
+			inc j 1
+
+			ssl outptr d0_lo
+			ss  outptr d0_lo
+			ssl outptr d0_hi
+			ss  outptr d0_hi
+		}
+		inc outadr 2
+		inc inptr ins
+		inc i 1
+	}
+	$jump_regs end
+	// ptr0 偏移值写回0
+	svw 0x09000058 0
+	nop
+}
+
+
+#define exp_m22p10(res,v) \
+	muls32 v v exp_k;\
+	sl v v 4;\
+	exp2_m16p16 res v;\
+	srs res res 6;	
+
+$func conv1_24inout_1x1_sigmoid(in input, in output, in kernels) {
+	reg j, rj0, 
+	reg sigv, max_sigv, min_sigv, m22p10_1, m22p10_1024, exp_k
+	jmp func_start
+
+sigmoid:
+	neg sigv sigv // -x
+	ifs sigv >= max_sigv {
+		// -x大于7, 直接返回0
+		mov sigv 0
+		ret
+	}
+	ifs sigv <= min_sigv {
+		mov sigv m22p10_1
+		ret
+	}
+	exp_m22p10(sigv, sigv)
+	inc sigv m22p10_1
+	divs32 sigv m22p10_1024 sigv
+	ret
+
+func_start:
+	lcs exp_k 1477			// log2(e):  1.442695*(2^10)
+	lcs max_sigv 7168 	// 7.0 in m26p10, e^7=1096.6... > 1024
+	lc min_sigv, -7168	// -7.0 
+	lcs m22p10_1 1024
+	lc m22p10_1024 1048576 	// 1024*1024
+	load_reg kptr kernels
+	load_reg inptr input
+	load_reg outptr output
+	
+	lcs bptr, 24*24*2
+	inc bptr kptr
+
+	lm_d in_0 inptr
+	lm_d in_1 inptr
+	lm_d in_2 inptr
+
+	lcs j 0
+	$jump_regs rj0
+	whileu j < 6 {
+		lm_d  b_03 bptr
+		lm_d  k0_0 kptr
+		lm_d  k0_1 kptr
+		lm_d  k0_2 kptr
+		lm_d  k1_0 kptr
+		lm_d  k1_1 kptr
+		lm_d  k1_2 kptr
+		lm_d  k2_0 kptr
+		lm_d  k2_1 kptr
+		lm_d  k2_2 kptr
+		simd_mac16_8 b0 k0_0 in_0
+		lm_d  k0_0 kptr
+		simd_mac16_8 b3 k0_0 in_0
+		simd_mac16_8 b1 k1_0 in_0
+		simd_mac16_8 b2 k2_0 in_0
+
+		simd_mac16_8 b0 k0_1 in_1
+		lm_d  k0_1 kptr
+		simd_mac16_8 b3 k0_1 in_1
+		simd_mac16_8 b1 k1_1 in_1
+		simd_mac16_8 b2 k2_1 in_1
+
+		simd_mac16_8 b0 k0_2 in_2
+		lm_d  k0_2 kptr
+		simd_mac16_8 b3 k0_2 in_2
+		simd_mac16_8 b1 k1_2 in_2
+		simd_mac16_8 b2 k2_2 in_2
+
+		
+		// sigmoid
+#define exec_sigmoid(v) \
+	srs sigv v 10;\
+	call sigmoid;\
+	mov v sigv;
+
+		exec_sigmoid(b0)
+		exec_sigmoid(b1)
+		exec_sigmoid(b2)
+		exec_sigmoid(b3)
+
+		inc j 1
+		simd_32to16 d0 b_03 0
+
+		s64 outptr d0
+	}
+	$jump_regs end
+}

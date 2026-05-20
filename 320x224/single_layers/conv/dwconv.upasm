@@ -1,0 +1,232 @@
+#include dwconv.upinc
+
+#define VMDA1_PADDING_ADDR 0x0900040c
+#define VDMA1_ADDR_0 0x09000414
+#define VDMA1_ADDR_1 0x09000418
+#define VDMA1_ADDR_2 0x0900041c
+#define VDMA1_ADDR_3 0x09000420
+#define VDMA1_ADDR_4 0x09000424
+#define VDMA1_ADDR_5 0x0900042c
+
+#var VDMA1_PARAM_X3_0 0
+#set_bits VDMA1_PARAM_X3_0 29 29 0					// [29]     VDMA1数据选择  0:从RAM读取数据 
+#set_bits VDMA1_PARAM_X3_0 28 28 0					// [28]     VDMA1数据1bit时的扩展数据值
+#set_bits VDMA1_PARAM_X3_0 26 24 2					// [26:24]  VDMA1数据格式 0:1bit, 1:8bit, 2:16bit, 3:32bit, 4:128bit
+#set_bits VDMA1_PARAM_X3_0 23 20 3					// [23:20]  VDMA1卷积核宽 	
+#set_bits VDMA1_PARAM_X3_0 19 16 3					// [19:16]  VDMA1卷积核高 
+#set_bits VDMA1_PARAM_X3_0 14 12 1					// [14:12]  VDMA1宽方向扩展像素(左、右分别扩展,9*3的窗口需设为3
+#set_bits VDMA1_PARAM_X3_0 10  8 1					// [10:8]   VDMA1高度扩宽图像行(上、下均扩展	
+#set_bits VDMA1_PARAM_X3_0  1  0 0					// [1:0]    VDMA1阁行\点取数据,0:连续取, 1:隔2行/点, 2:隔4行/点	
+
+#var VDMA1_PARAM_X5_0 0
+#set_bits VDMA1_PARAM_X5_0 29 29 0					// [29]     VDMA1数据选择  0:从RAM读取数据 
+#set_bits VDMA1_PARAM_X5_0 28 28 0					// [28]     VDMA1数据1bit时的扩展数据值
+#set_bits VDMA1_PARAM_X5_0 26 24 2					// [26:24]  VDMA1数据格式 0:1bit, 1:8bit, 2:16bit, 3:32bit, 4:128bit
+#set_bits VDMA1_PARAM_X5_0 23 20 5					// [23:20]  VDMA1卷积核宽 	
+#set_bits VDMA1_PARAM_X5_0 19 16 5					// [19:16]  VDMA1卷积核高 
+#set_bits VDMA1_PARAM_X5_0 14 12 2					// [14:12]  VDMA1宽方向扩展像素(左、右分别扩展,9*3的窗口需设为3
+#set_bits VDMA1_PARAM_X5_0 10  8 2					// [10:8]   VDMA1高度扩宽图像行(上、下均扩展	
+#set_bits VDMA1_PARAM_X5_0  1  0 0					// [1:0]    VDMA1阁行\点取数据,0:连续取, 1:隔2行/点, 2:隔4行/点	
+
+
+#var VDMA1_PARAM_1 0 
+#set_bits VDMA1_PARAM_1 28 16 0					// [28:16]  VDMA1读取图像时为降采样后的图像宽(列/矩阵乘法时为输出矩阵宽,VDMA1读取1行图像时需配置为读取一行图像的字节数  
+#set_bits VDMA1_PARAM_1 11  0 0					// [11:0]   VDMA1读取图像时为降采样后的图像高(行/矩阵乘法时为输出矩阵高
+
+#var VDMA1_PARAM_2 0
+#set_bits VDMA1_PARAM_2 14 12 0					// [14:12]  VDMA1从PSRAM读取图象时降采样倍数: 1:2倍, 3:4倍, 7:8倍 
+#set_bits VDMA1_PARAM_2 10  0 1024				// [10:0]   VDMA1从PSRAM读取时PSRAM请求阈值,缓存可写数据大于阈值后请求PSRAM读
+
+#var VDMA1_PARAM_4 0
+#set_bits VDMA1_PARAM_4 31 28 5					// [30:28]  VDMA1指令码
+#set_bits VDMA1_PARAM_4 14  0 0					// [14:0]   VDMA1读取图像时为原图一行的字节数(宽*像素字节数, 读矩阵时为第一个矩阵一行的字节数(宽*单个数据字节数
+
+#define kptr ptr0
+
+
+#define tmp r10
+#define t2 r11
+
+#define res r10
+
+#define in_ptr r12
+#define in_end r13
+#define out_ptr r14
+#define out_stride r15
+#define in_stride r16
+#define bptr r17
+#define output_ptr r18
+#define output_end r19
+#define output_whc_x2 r20
+#define cx2 r21
+
+#define k0 s0
+#define k1 s1
+#define k2 s2
+#define k3 s3
+
+#define in_0 s8
+#define in_1 s9
+#define in_2 s10
+#define in_3 s11
+
+dwconv_tmp_rp:
+.word 0
+
+@export dwconv5
+dwconv5:
+	svw dwconv_tmp_rp rp
+	sv VMDA1_PADDING_ADDR 0
+	lc tmp VDMA1_PARAM_X5_0
+
+	sv VDMA1_ADDR_0 tmp
+	// [28:16]  VDMA1读取图像时为降采样后的图像宽(列/矩阵乘法时为输出矩阵宽,VDMA1读取1行图像时需配置为读取一行图像的字节数
+	// [11:0]   VDMA1读取图像时为降采样后的图像高(行/矩阵乘法时为输出矩阵高
+	sl tmp dwconv_out_w 16
+	or tmp tmp dwconv_out_h
+	sv VDMA1_ADDR_1 tmp
+
+	svw VDMA1_ADDR_2 VDMA1_PARAM_2
+
+	muls16 tmp dwconv_in_w dwconv_in_h
+	sl tmp tmp 1
+	sv VDMA1_ADDR_3 tmp
+
+	lc tmp VDMA1_PARAM_4
+	sl t2 dwconv_in_w 1
+	or tmp tmp t2
+	sv VDMA1_ADDR_4 tmp
+
+	sl out_stride dwconv_c 1
+	muls16 in_stride dwconv_in_w dwconv_in_h
+	sl in_stride in_stride 1
+
+	mov in_ptr dwconv_in_adr
+	mov out_ptr dwconv_out_adr
+
+	muls32 in_end in_stride dwconv_c
+	inc in_end in_ptr
+
+	mov bptr dwconv_bias_adr
+	mov kptr dwconv_kernel_adr
+
+	muls16 output_whc_x2 dwconv_out_w dwconv_out_h
+	sl cx2 dwconv_c 1
+	muls32 output_whc_x2 output_whc_x2 cx2
+
+	$jump_regs r33 r34
+	whileu in_ptr < in_end {
+		sv VDMA1_ADDR_5 in_ptr
+		mov output_ptr out_ptr
+		add output_end out_ptr output_whc_x2
+
+		lm_d k0 kptr
+		lm_d k1 kptr
+		lm_d k2 kptr
+		lm_d k3 kptr
+
+		whileu output_ptr < output_end {
+			wait_wnd
+
+			lw res bptr
+			simd_mac16_8 res in_0 k0
+			nop
+			simd_mac16_8 res in_1 k1
+			nop
+			simd_mac16_8 res in_2 k2
+			nop
+			simd_mac16_8 res in_3 k3
+
+			img_data_rd
+			relu res res 10
+
+			ssl output_ptr res
+			inc output_ptr cx2
+		}
+
+		inc bptr 4
+		inc out_ptr 2
+		inc in_ptr in_stride
+	}
+	$jump_regs end
+
+	
+	lvw rp dwconv_tmp_rp
+	ret
+
+@export dwconv3
+dwconv3:
+	svw dwconv_tmp_rp rp
+	sv VMDA1_PADDING_ADDR 0
+	lc tmp VDMA1_PARAM_X3_0
+	ifu dwconv_in_w > dwconv_out_w {
+		// [1:0]    VDMA1阁行\点取数据,0:连续取, 1:隔2行/点, 2:隔4行/点	
+		or tmp tmp 1
+	}
+	sv VDMA1_ADDR_0 tmp
+	// [28:16]  VDMA1读取图像时为降采样后的图像宽(列/矩阵乘法时为输出矩阵宽,VDMA1读取1行图像时需配置为读取一行图像的字节数
+	// [11:0]   VDMA1读取图像时为降采样后的图像高(行/矩阵乘法时为输出矩阵高
+	sl tmp dwconv_out_w 16
+	or tmp tmp dwconv_out_h
+	sv VDMA1_ADDR_1 tmp
+
+	svw VDMA1_ADDR_2 VDMA1_PARAM_2
+
+	muls16 tmp dwconv_in_w dwconv_in_h
+	sl tmp tmp 1
+	sv VDMA1_ADDR_3 tmp
+
+	lc tmp VDMA1_PARAM_4
+	sl t2 dwconv_in_w 1
+	or tmp tmp t2
+	sv VDMA1_ADDR_4 tmp
+
+	sl out_stride dwconv_c 1
+	muls16 in_stride dwconv_in_w dwconv_in_h
+	sl in_stride in_stride 1
+
+	mov in_ptr dwconv_in_adr
+	mov out_ptr dwconv_out_adr
+
+	muls32 in_end in_stride dwconv_c
+	inc in_end in_ptr
+
+	mov bptr dwconv_bias_adr
+	mov kptr dwconv_kernel_adr
+
+	muls16 output_whc_x2 dwconv_out_w dwconv_out_h
+	sl cx2 dwconv_c 1
+	muls32 output_whc_x2 output_whc_x2 cx2
+
+	$jump_regs r33 r34
+	whileu in_ptr < in_end {
+		sv VDMA1_ADDR_5 in_ptr
+		mov output_ptr out_ptr
+		add output_end out_ptr output_whc_x2
+
+		lm_d k0 kptr
+		lm_d k1 kptr
+
+		whileu output_ptr < output_end {
+			wait_wnd
+
+			lw res bptr
+			simd_mac16_8 res in_0 k0
+			nop
+			simd_mac16_8 res in_1 k1
+
+			img_data_rd
+			srs res res 10
+
+			ssl output_ptr res
+			inc output_ptr cx2
+		}
+
+		inc bptr 4
+		inc out_ptr 2
+		inc in_ptr in_stride
+	}
+	$jump_regs end
+	
+	lvw rp dwconv_tmp_rp
+	ret

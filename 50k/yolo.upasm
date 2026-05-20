@@ -1,0 +1,313 @@
+#include "yolo_size.upinc"
+#include "yolo.upinc"
+#include "u31_sys_macros.upinc"
+
+@import layer_16_psram_adr
+
+@import layer_0
+@import layer_1
+@import layer_2
+@import layer_3
+@import layer_16
+@import layer_4
+@import layer_5
+@import layer_6
+@import layer_7
+@import layer_8
+@import layer_9
+@import layer_10
+@import layer_11
+@import layer_12
+@import layer_13
+@import layer_14
+@import layer_18
+@import layer_19
+@import layer_20
+@import layer_21
+@import layer_22
+@import layer_23
+@import layer_24
+@import layer_25
+@import layer_26
+@import layer_27
+@import layer_28
+@import layer_29
+@import layer_31
+@import layer_33
+@import layer_34
+@import layer_35
+@import layer_36
+@import layer_37
+
+@import layer_0_biases
+@import layer_0_kernels
+@import layer_1_biases
+@import layer_1_kernels
+@import layer_2_biases
+@import layer_2_kernels
+@import layer_3_biases
+@import layer_3_kernels
+@import layer_4_biases
+@import layer_4_kernels
+@import layer_5_biases
+@import layer_5_kernels
+@import layer_6_biases
+@import layer_6_kernels
+@import layer_7_biases
+@import layer_7_kernels
+@import layer_8_biases
+@import layer_8_kernels
+@import layer_10_biases
+@import layer_10_kernels
+@import layer_11_biases
+@import layer_11_kernels
+@import layer_12_biases
+@import layer_12_kernels
+@import layer_14_biases
+@import layer_14_kernels
+@import layer_18_biases
+@import layer_18_kernels
+@import layer_19_biases
+@import layer_19_kernels
+@import layer_20_biases
+@import layer_20_kernels
+@import layer_21_biases
+@import layer_21_kernels
+@import layer_22_biases
+@import layer_22_kernels
+@import layer_23_biases
+@import layer_23_kernels
+@import layer_25_biases
+@import layer_25_kernels
+@import layer_26_biases
+@import layer_26_kernels
+@import layer_27_biases
+@import layer_27_kernels
+@import layer_29_biases
+@import layer_29_kernels
+@import layer_33_biases
+@import layer_33_kernels
+@import layer_34_biases
+@import layer_34_kernels
+@import layer_35_biases
+@import layer_35_kernels
+@import layer_36_biases
+@import layer_36_kernels
+
+@import init_psram
+
+#var LAYER_16_PSRAM_WRITE 0
+#set_bits LAYER_16_PSRAM_WRITE 31 24 0x80	//write: 0x80; read: 0x00
+#set_bits LAYER_16_PSRAM_WRITE 23 23 1		//1:write,RAM到PSRAM 0:read, PSRAM到RAM  
+#set_bits LAYER_16_PSRAM_WRITE 18  0 LAYER_16_OUTPUT_SIZE		//1:write,RAM到PSRAM 0:read, PSRAM到RAM  
+
+#var LAYER_16_PSRAM_READ 0
+#set_bits LAYER_16_PSRAM_READ 31 24 0x00		//write: 0x80; read: 0x00
+#set_bits LAYER_16_PSRAM_READ 23 23 0	//1:write,RAM到PSRAM 0:read, PSRAM到RAM  
+#set_bits LAYER_16_PSRAM_READ 18  0 LAYER_16_OUTPUT_SIZE		//1:write,RAM到PSRAM 0:read, PSRAM到RAM  
+
+yolo_176x88:
+	////set img_out/vdma buffer address
+	lc r0, 0x09000454
+	lc r1, VDMA1_FIFO_ADR
+	sw r0, r1
+
+	add r0, r0, 4
+	lc r1, VDMA1_FIFO_ADR
+	sw r0, r1
+	
+	add r0, r0, 4
+	lc r1, VDMA_FIFO_LENGTH
+	sw r0, r1
+
+	call init_psram
+
+	// 初始化窗口读取
+	bit_set r91, r91, 31
+
+	// 初始化计时器
+	svw 0x09000a04 0xffffffff
+	sv  0x09000a00 0x10
+	lcs ptr4 layer_ts
+
+	lcs kernel_addr layer_0_kernels
+	lcs bias_addr layer_0_biases
+	call layer_0
+	call record_ts
+
+	lcs kernel_addr layer_1_kernels
+	lcs bias_addr layer_1_biases
+	call layer_1
+	call record_ts
+
+	lcs kernel_addr layer_2_kernels
+	lcs bias_addr layer_2_biases
+	call layer_2
+	call record_ts
+
+	lcs kernel_addr layer_3_kernels
+	lcs bias_addr layer_3_biases
+	call layer_3
+	call record_ts
+
+	call layer_16
+	call record_ts
+
+	svw 0x09000608 LAYER_16_PSRAM_ADDR
+	svw 0x0900060c layer_16_output	
+	svw 0x09000610 LAYER_16_PSRAM_WRITE
+	hlt 7
+	call record_ts
+
+	lcs kernel_addr layer_4_kernels
+	lcs bias_addr layer_4_biases
+	call layer_4
+	call record_ts
+
+	lcs kernel_addr layer_5_kernels
+	lcs bias_addr layer_5_biases
+	call layer_5
+	call record_ts
+
+	lcs kernel_addr layer_6_kernels
+	lcs bias_addr layer_6_biases
+	call layer_6
+	call record_ts
+
+	lcs kernel_addr layer_7_kernels
+	lcs bias_addr layer_7_biases
+	call layer_7
+	call record_ts
+
+	lcs kernel_addr layer_8_kernels
+	lcs bias_addr layer_8_biases
+	call layer_8
+	call record_ts
+
+	call layer_9
+	call record_ts
+
+	lcs kernel_addr layer_10_kernels
+	lcs bias_addr layer_10_biases
+	call layer_10
+	call record_ts
+
+	lcs kernel_addr layer_11_kernels
+	lcs bias_addr layer_11_biases
+	call layer_11
+	call record_ts
+
+	lcs kernel_addr layer_12_kernels
+	lcs bias_addr layer_12_biases
+	call layer_12
+	call record_ts
+
+	svw 0x09000608 LAYER_16_PSRAM_ADDR
+	svw 0x0900060c layer_14_output
+	svw 0x09000610 LAYER_16_PSRAM_READ
+	call layer_13
+	hlt 7
+	call record_ts
+
+	lcs kernel_addr layer_14_kernels
+	lcs bias_addr layer_14_biases
+	call layer_14
+	call record_ts
+
+	lcs kernel_addr layer_18_kernels
+	lcs bias_addr layer_18_biases
+	call layer_18
+	call record_ts
+
+	call layer_31
+	call record_ts
+
+	lcs kernel_addr layer_19_kernels
+	lcs bias_addr layer_19_biases
+	call layer_19
+	call record_ts
+
+	lcs kernel_addr layer_20_kernels
+	lcs bias_addr layer_20_biases
+	call layer_20
+	call record_ts
+
+	lcs kernel_addr layer_21_kernels
+	lcs bias_addr layer_21_biases
+	call layer_21
+	call record_ts
+
+	lcs kernel_addr layer_22_kernels
+	lcs bias_addr layer_22_biases
+	call layer_22
+	call record_ts
+
+	lcs kernel_addr layer_23_kernels
+	lcs bias_addr layer_23_biases
+	call layer_23
+	call record_ts
+
+	call layer_24
+	call record_ts
+
+	lcs kernel_addr layer_25_kernels
+	lcs bias_addr layer_25_biases
+	call layer_25
+	call record_ts
+
+	lcs kernel_addr layer_26_kernels
+	lcs bias_addr layer_26_biases
+	call layer_26
+	call record_ts
+
+	lcs kernel_addr layer_27_kernels
+	lcs bias_addr layer_27_biases
+	call layer_27
+	call record_ts
+
+	call layer_28
+	call record_ts
+
+	lcs kernel_addr layer_29_kernels
+	lcs bias_addr layer_29_biases
+	call layer_29
+	call record_ts
+
+	lcs kernel_addr layer_33_kernels
+	lcs bias_addr layer_33_biases
+	call layer_33
+	call record_ts
+
+	lcs kernel_addr layer_34_kernels
+	lcs bias_addr layer_34_biases
+	call layer_34
+	call record_ts
+
+	lcs kernel_addr layer_35_kernels
+	lcs bias_addr layer_35_biases
+	call layer_35
+	call record_ts
+
+	lcs kernel_addr layer_36_kernels
+	lcs bias_addr layer_36_biases
+	call layer_36
+	call record_ts
+
+	call layer_37
+	call record_ts
+
+	ret
+
+record_ts:
+	lvw r0 0x09000a04
+	lvw r1 tmp_ts
+	sub r1 r0 r1
+	sw ptr4 r1
+	sv tmp_ts r0
+	ret
+
+tmp_ts:
+.word 0
+
+layer_ts:
+.reserve 256

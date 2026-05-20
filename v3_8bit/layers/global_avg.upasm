@@ -1,0 +1,234 @@
+#include layer_param.upinc
+#include yolo_funcs.upinc
+#include layer_regs.upinc
+
+#define sum r19
+#define i r20
+#define c r21
+#define rj0 r22
+
+#define wxh outwxh
+
+#define LOAD_CALC_8 \
+lm_d s1 inptr;\
+simd_mac16_8 sum s0 s1;
+
+@export global_avg
+global_avg:
+	simd_ext16 s0 1 0 // 设置16个1
+	simd_ext16 s6 1 0 // 设置16个1
+	lcs c 24
+	mov inptr inadr
+	mov outptr outadr
+
+	lc rj0 RUN_20X10X24
+	cjmpe rj0 sizeFlag SIZE_20X10X24
+	lc rj0 RUN_40X20X24
+	cjmpe rj0 sizeFlag SIZE_40X20X24
+	lc rj0 RUN_80X40X24
+	cjmpe rj0 sizeFlag SIZE_80X40X24
+	jmp END
+
+RUN_20X10X24:
+	lc wxh, 1.0 / (20.0*10.0)
+	lcs i 0
+	$jump_regs rj0
+	whileu i < c {
+		lcs sum 0
+
+		// 5*5*8=200
+		repeat_sta 5
+process_5:
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		repeat_end process_5
+
+		// 计算平均值
+		i32tof32 sum sum 31
+		fmul sum sum wxh
+		inc i 1
+		f32toi32 sum sum 31
+		
+		ssl outptr sum
+	}
+	$jump_regs end
+	jmp END
+
+RUN_40X20X24:
+	lcs wxh, 40*20
+	lcs i 0
+	$jump_regs rj0
+	whileu i < c {
+		lcs sum 0
+
+		// 10*10*8=800
+		repeat_sta 10
+process_10:
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		repeat_end process_10
+
+		// 计算平均值
+		divs32 sum sum wxh
+		ssl outptr sum
+		inc i 1
+	}
+	$jump_regs end
+	jmp END
+
+RUN_80X40X24:
+	lcs wxh, 80*40
+	lcs i 0
+	$jump_regs rj0
+	whileu i < c {
+		lcs sum 0
+		// 40*10*8=3200
+		repeat_sta 40
+process_10_2:
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		repeat_end process_10_2
+
+		// 计算平均值
+		divs32 sum sum wxh
+		ssl outptr sum
+		inc i 1
+	}
+	$jump_regs end
+	jmp END
+END:
+
+	ret
+
+/*
+#define outptr ptr0
+#define inptr ptr1
+
+$func global_avg(in sizetype) {
+	reg i, j, c, sum, wxh
+	reg rj0
+	reg param_ptr(rj0)
+
+	lc param_ptr, LAYER_PARAM_ADDR
+	lw inptr param_ptr, INPUT_ADDR_OFF
+	lw outptr param_ptr, OUTPUT_ADDR_OFF
+
+	simd_ext16 s0 1 0 // 设置16个1
+	simd_ext16 s6 1 0 // 设置16个1
+	lcs c 24
+
+
+	load_reg i sizetype
+	lcs rj0 RUN_20X10X24
+	cjmpe rj0 i SIZE_20X10X24
+	lcs rj0 RUN_40X20X24
+	cjmpe rj0 i SIZE_40X20X24
+	lcs rj0 RUN_80X40X24
+	cjmpe rj0 i SIZE_80X40X24
+	jmp END
+
+RUN_20X10X24:
+	lcs wxh, 20*10
+	lcs i 0
+	$jump_regs rj0
+	whileu i < c {
+		lcs sum 0
+
+		// 5*5*8=200
+		repeat_sta 5
+process_5:
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		repeat_end process_5
+
+		// 计算平均值
+		divs32 sum sum wxh
+		ssl outptr sum
+		inc i 1
+	}
+	$jump_regs end
+	jmp END
+
+RUN_40X20X24:
+	lcs wxh, 40*20
+	lcs i 0
+	$jump_regs rj0
+	whileu i < c {
+		lcs sum 0
+
+		// 10*10*8=800
+		repeat_sta 10
+process_10:
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		repeat_end process_10
+
+		// 计算平均值
+		divs32 sum sum wxh
+		ssl outptr sum
+		inc i 1
+	}
+	$jump_regs end
+	jmp END
+
+RUN_80X40X24:
+	lcs wxh, 80*40
+	lcs i 0
+	$jump_regs rj0
+	whileu i < c {
+		lcs sum 0
+		// 40*10*8=3200
+		repeat_sta 40
+process_10_2:
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		LOAD_CALC_8
+		repeat_end process_10_2
+
+		// 计算平均值
+		divs32 sum sum wxh
+		ssl outptr sum
+		inc i 1
+	}
+	$jump_regs end
+	jmp END
+END:
+}
+*/

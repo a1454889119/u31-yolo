@@ -1,0 +1,134 @@
+
+#define outptr_cwh ptr0
+#define outptr_whc ptr1
+
+$func maxpool5_cwh(in input, in outcwh, in width, in height, in channels, in outstride) {
+	reg inadr, outadr, w, h, c, i, j, wxh, wxh2, outs
+	reg rj0, rj1
+	reg maxv(w)
+	nop
+	load_reg inadr input
+	load_reg outadr outcwh
+	load_reg w width
+	load_reg h height
+	load_reg c channels
+	load_reg outs outstride
+
+	muls16 wxh w, h
+	sl wxh2 wxh 1
+
+	// 设置ptr0偏移值为outs	
+	lcs j 0x10000
+	or i outs j
+	svw 0x09000058, i
+
+	svw 0x0900040c 0x00008000
+	svw 0x09000414 0x02552200
+	//svw 0x09000418 0x0014000F
+	sl i w 16
+	or i i h
+	svw 0x09000418 i
+	svw 0x0900041C 0x00000000
+	//svw 0x09000420 0x00000258
+	svw 0x09000420 wxh2
+	lc i 0x50000000
+	or i i w
+	inc i w
+	svw 0x09000424 i
+
+	lcs i 0
+	$jump_regs rj0 rj1
+	whileu i < c {
+		svw 0x0900042C inadr
+		mov outptr_cwh outadr
+		lcs j 0
+		whileu j < wxh {
+			wait_wnd
+			simd_max16_8 s4_0 s8
+			simd_max16_8 s4_1 s9
+			simd_max16_8 s4_2 s10
+			rd16l s4_3 s11 0
+			img_data_rd
+
+			max maxv s4_0 s4_1
+			max maxv maxv s4_2
+			max maxv maxv s4_3
+			ssl outptr_cwh maxv
+
+			inc j 1
+		}
+		inc outadr 2
+		inc inadr wxh2
+		inc i 1
+	}
+	$jump_regs end
+	// ptr0 偏移值写回0
+	svw 0x09000058 0
+	nop
+}
+
+$func maxpool5_whc_cwh(in input, in outwhc, in outcwh, in width, in height, in channels, in outstride) {
+	reg inadr, outadr, w, h, c, i, j, wxh, wxh2, outs
+	reg rj0, rj1
+	reg maxv(w)
+	nop
+	load_reg inadr input
+	load_reg outadr outcwh
+	load_reg outptr_whc outwhc
+	load_reg w width
+	load_reg h height
+	load_reg c channels
+	load_reg outs outstride
+
+	muls16 wxh w, h
+	sl wxh2 wxh 1
+
+	// 设置ptr0偏移值为outs
+	lcs j 0x10000
+	or i outs j
+	svw 0x09000058, i
+
+	svw 0x0900040c 0x00008000
+	svw 0x09000414 0x02552200
+	//svw 0x09000418 0x0014000F
+	sl i w 16
+	or i i h
+	svw 0x09000418 i
+	svw 0x0900041C 0x00000000
+	//svw 0x09000420 0x00000258
+	svw 0x09000420 wxh2
+	lc i 0x50000000
+	or i i w
+	inc i w
+	svw 0x09000424 i
+
+	lcs i 0
+	$jump_regs rj0 rj1
+	whileu i < c {
+		svw 0x0900042C inadr
+		mov outptr_cwh outadr
+		lcs j 0
+		whileu j < wxh {
+			wait_wnd
+			simd_max16_8 s4_0 s8
+			simd_max16_8 s4_1 s9
+			simd_max16_8 s4_2 s10
+			rd16l s4_3 s11 0
+			img_data_rd
+
+			max maxv s4_0 s4_1
+			max maxv maxv s4_2
+			max maxv maxv s4_3			
+			ssl outptr_cwh maxv
+			ssl outptr_whc maxv
+			inc j 1
+		}
+		inc outadr 2
+		inc inadr wxh2
+		inc i 1
+	}
+	$jump_regs end
+	// ptr0 偏移值写回0
+	svw 0x09000058 0
+	nop
+}

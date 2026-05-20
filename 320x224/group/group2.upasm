@@ -1,0 +1,64 @@
+#include layer_io_size.upinc
+#include memory_layout.upinc
+#include shuffle.upinc
+#include conv1.upinc
+#include dwconv.upinc
+
+@import conv1_12_whc
+@import conv1_12
+
+@import tmp_rp_adr0
+
+#define GROUP2_A (IO_ADR + 0)
+#define GROUP2_B (IO_ADR + 179200)
+#define GROUP2_C (IO_ADR + 53760)
+#define GROUP2_D (IO_ADR + 107520)
+#define GROUP2_E (IO_ADR + 134400)
+
+@export group2
+group2:
+	sv tmp_rp_adr0 rp
+
+	
+	lcs shuffle_w 40
+	lcs shuffle_h 28
+	lc  shuffle_input_adr, GROUP2_B
+	lc  shuffle_input_adr_2, GROUP2_A
+	lc  shuffle_output_adr, GROUP2_C
+	call shuffle_8_16
+	
+	lcs conv1_w 40
+	lcs conv1_h 28
+	// 输入24通道的后12通道, 输出12通道
+	lcs conv1_in_stride 48
+	lcs conv1_out_stride 24
+	lc conv1_in_adr, GROUP2_C + 24
+	lc conv1_out_adr, GROUP2_D
+	lc conv1_bias_adr, LAYER_11_BIAS_ADDR
+	lc conv1_kernel_adr, LAYER_11_KERNEL_ADDR
+	call conv1_12_whc
+
+	lcs dwconv_out_w 40
+	lcs dwconv_out_h 28
+	lcs dwconv_in_w 40
+	lcs dwconv_in_h 28
+	lcs dwconv_c 12
+	lc  dwconv_in_adr, GROUP2_D
+	lc  dwconv_out_adr, GROUP2_E
+	lc  dwconv_bias_adr, LAYER_12_BIAS_ADDR
+	lc  dwconv_kernel_adr, LAYER_12_KERNEL_ADDR
+	call dwconv3
+
+	lcs conv1_w 40
+	lcs conv1_h 28
+	// 输入12通道, 输出24通道的后12通道
+	lcs conv1_in_stride 24
+	lcs conv1_out_stride, 48
+	lc conv1_in_adr, GROUP2_E
+	lc conv1_out_adr, GROUP2_C + 24
+	lc conv1_bias_adr, LAYER_13_BIAS_ADDR
+	lc conv1_kernel_adr, LAYER_13_KERNEL_ADDR
+	call conv1_12
+
+	lv rp tmp_rp_adr0
+	ret

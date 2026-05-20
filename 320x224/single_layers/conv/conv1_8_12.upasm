@@ -1,0 +1,118 @@
+#include conv1.upinc
+
+#define output_ptr ptr0
+#define input_ptr ptr1
+#define kernel_ptr ptr2
+
+#define out_ptr r10
+
+#define br0 s4
+#define br0_0 s4_0
+#define br0_1 s4_1
+#define br0_2 s4_2
+#define br0_3 s4_3
+
+#define br1 s5
+#define br1_0 s5_0
+#define br1_1 s5_1
+#define br1_2 s5_2
+#define br1_3 s5_3
+
+#define br2 s6
+#define br2_0 s6_0
+#define br2_1 s6_1
+#define br2_2 s6_2
+#define br2_3 s6_3
+
+#define in_0 s0
+
+#define k0  s1
+#define k1  s2
+#define k2  s3
+#define k3  s14
+#define k4  s15
+#define k5  s7
+#define k6  s8
+#define k7  s9
+#define k8  s10
+#define k9  s11
+#define k10 s12
+#define k11 s13
+
+
+// 只有layer2, 不用考虑输入输出的stride
+@export conv1_8_12
+conv1_8_12:
+
+	mov kernel_ptr conv1_kernel_adr
+	mov input_ptr conv1_in_adr
+	mov out_ptr conv1_out_adr
+
+	lm_d k0  kernel_ptr
+	lm_d k1  kernel_ptr
+	lm_d k2  kernel_ptr
+	lm_d k3  kernel_ptr
+	lm_d k4  kernel_ptr
+	lm_d k5  kernel_ptr
+	lm_d k6  kernel_ptr
+	lm_d k7  kernel_ptr
+	lm_d k8  kernel_ptr
+	lm_d k9  kernel_ptr
+	lm_d k10 kernel_ptr
+	lm_d k11 kernel_ptr
+
+	muls16 conv1_input_end conv1_w conv1_h
+	muls32 conv1_input_end conv1_input_end conv1_in_stride
+	inc conv1_input_end input_ptr
+
+	muls16 conv1_out_stride conv1_w conv1_h
+	sl conv1_out_stride conv1_out_stride 1
+	bit_set conv1_out_stride conv1_out_stride 16
+	sv PTR0_OFFSET_ADR conv1_out_stride
+
+
+	$jump_regs r30
+	whileu input_ptr < conv1_input_end {
+		mov output_ptr out_ptr
+		lm_d   in_0 input_ptr
+		lm_d br0 conv1_bias_adr
+		lm_d br1 conv1_bias_adr 16
+		lm_d br2 conv1_bias_adr 32
+
+		simd_mac16_8 br0_0 k0  in_0
+		simd_mac16_8 br0_1 k1  in_0
+		simd_mac16_8 br0_2 k2  in_0
+		simd_mac16_8 br0_3 k3  in_0
+		simd_mac16_8 br1_0 k4  in_0
+		simd_mac16_8 br1_1 k5  in_0
+		simd_mac16_8 br1_2 k6  in_0
+		simd_mac16_8 br1_3 k7  in_0
+		simd_mac16_8 br2_0 k8  in_0
+		simd_mac16_8 br2_1 k9  in_0
+		simd_mac16_8 br2_2 k10 in_0
+		simd_mac16_8 br2_3 k11 in_0
+
+		simd_relu d0 br0 10
+		simd_relu d1 br1 10
+		simd_relu d2 br2 10
+
+		ssl output_ptr d0_lo
+		ss  output_ptr d0_lo
+		ssl output_ptr d0_hi
+		ss  output_ptr d0_hi
+
+		ssl output_ptr d1_lo
+		ss  output_ptr d1_lo
+		ssl output_ptr d1_hi
+		ss  output_ptr d1_hi
+
+		ssl output_ptr d2_lo
+		ss  output_ptr d2_lo
+		ssl output_ptr d2_hi
+		ss  output_ptr d2_hi
+
+		inc out_ptr 2
+	}
+	$jump_regs end
+	sv PTR0_OFFSET_ADR 0
+	ret

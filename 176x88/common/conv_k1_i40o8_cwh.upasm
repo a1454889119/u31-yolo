@@ -1,0 +1,180 @@
+
+
+#define in s0
+
+
+#define k0_0 s1
+#define k0_1 s2
+#define k0_2 s3
+#define k0_3 s4
+#define k0_4 s5
+
+#define k1_0 s6
+#define k1_1 s7
+#define k1_2 s8
+#define k1_3 s9
+#define k1_4 s10
+
+#define k2_0 s11
+#define k2_1 s12
+#define k2_2 s13
+#define k2_3 s14
+#define k2_4 s15
+
+#define b0 r0
+#define b1 r1
+#define b2 r2
+
+#define input_end r4
+#define input_start r5
+#define bias_ptr r6
+#define i r7
+#define output_start r8
+#define output_ptr r9
+
+#define input_ptr ptr0
+#define kernel_ptr ptr1
+
+#export conv_k1_i40o8_params
+conv_k1_i40o8_params:
+.word 0 // input_ptr
+.word 0 // input_end
+.word 0 // kernel_ptr
+.word 0 // bias_ptr
+.word 0 // output_ptr
+
+#export conv_k1_i40o8_cwh
+conv_k1_i40o8_cwh:
+	lcs ptr2 conv_k1_i40o8_params
+	nop
+	lw input_ptr ptr2
+	lw input_end ptr2
+	lw kernel_ptr ptr2
+	lw bias_ptr ptr2
+	lw output_ptr ptr2
+
+	mov output_start output_ptr
+	mov input_start input_ptr
+
+	lcs i 0
+	#jump-regs r20 ...
+	// 2轮, 每轮得到3个输出通道
+	whileu i < 2 {
+		lm k0_0 kernel_ptr
+		lm k0_1 kernel_ptr
+		lm k0_2 kernel_ptr
+		lm k0_3 kernel_ptr
+		lm k0_4 kernel_ptr
+		lm k1_0 kernel_ptr
+		lm k1_1 kernel_ptr
+		lm k1_2 kernel_ptr
+		lm k1_3 kernel_ptr
+		lm k1_4 kernel_ptr
+		lm k2_0 kernel_ptr
+		lm k2_1 kernel_ptr
+		lm k2_2 kernel_ptr
+		lm k2_3 kernel_ptr
+		lm k2_4 kernel_ptr
+		mov output_ptr output_start
+		mov input_ptr input_start
+		whileu input_ptr < input_end {
+			lw b0 bias_ptr
+			lw b1 bias_ptr 4
+			lw b2 bias_ptr 8
+
+			lm in input_ptr
+			simd_muladd b0 k0_0 in
+			simd_muladd b1 k1_0 in
+			simd_muladd b2 k2_0 in
+
+			lm in input_ptr
+			simd_muladd b0 k0_1 in
+			simd_muladd b1 k1_1 in
+			simd_muladd b2 k2_1 in
+
+			lm in input_ptr
+			simd_muladd b0 k0_2 in
+			simd_muladd b1 k1_2 in
+			simd_muladd b2 k2_2 in
+
+			lm in input_ptr
+			simd_muladd b0 k0_3 in
+			simd_muladd b1 k1_3 in
+			simd_muladd b2 k2_3 in
+
+			lm in input_ptr
+			simd_muladd b0 k0_4 in
+			simd_muladd b1 k1_4 in
+			simd_muladd b2 k2_4 in
+			nop
+
+			srs b0 b0 10
+			srs b1 b1 10
+			srs b2 b2 10
+
+			ssu output_ptr b0
+			ssu output_ptr b1 2
+			ssu output_ptr b2 4
+
+			inc output_ptr 16
+		}
+		inc bias_ptr 12
+		inc output_start 6
+		inc i 1
+	}
+	#jump-regs end
+
+	// 最后一轮2个输出通道
+	lm k0_0 kernel_ptr
+	lm k0_1 kernel_ptr
+	lm k0_2 kernel_ptr
+	lm k0_3 kernel_ptr
+	lm k0_4 kernel_ptr
+	lm k1_0 kernel_ptr
+	lm k1_1 kernel_ptr
+	lm k1_2 kernel_ptr
+	lm k1_3 kernel_ptr
+	lm k1_4 kernel_ptr
+	mov output_ptr output_start
+	mov input_ptr input_start
+	#jump-regs r20
+	whileu input_ptr < input_end {
+		lw b0 bias_ptr
+		lw b1 bias_ptr 4
+
+		lm in input_ptr
+		simd_muladd b0 k0_0 in
+		simd_muladd b1 k1_0 in
+		nop
+		
+		lm in input_ptr
+		simd_muladd b0 k0_1 in
+		simd_muladd b1 k1_1 in
+		nop
+
+		lm in input_ptr
+		simd_muladd b0 k0_2 in
+		simd_muladd b1 k1_2 in
+		nop
+
+		lm in input_ptr
+		simd_muladd b0 k0_3 in
+		simd_muladd b1 k1_3 in
+		nop
+
+		lm in input_ptr
+		simd_muladd b0 k0_4 in
+		simd_muladd b1 k1_4 in
+		nop
+		nop
+
+		srs b0 b0 10
+		srs b1 b1 10
+
+		ssu output_ptr b0
+		ssu output_ptr b1 2
+
+		inc output_ptr 16
+	}
+	#jump-regs end
+	ret

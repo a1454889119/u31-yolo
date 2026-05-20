@@ -1,0 +1,11 @@
+
+
+@auto_export_start
+
+box_count:
+.word 0
+
+box_data:
+.reserve 630	// 63*10
+
+@auto_export_end

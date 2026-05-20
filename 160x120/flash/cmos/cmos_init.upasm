@@ -1,0 +1,166 @@
+
+#include cmos_def.upinc
+
+@import CMOS_INI_BF3901
+@import CMOS_INI_BF30a2
+
+@import IMAGE_INPUT_ADDR0
+@import IMAGE_INPUT_ADDR1
+
+
+#var VAR_BIT24_1 0
+#set_bits VAR_BIT24_1 24 24 1
+
+@export init_cmos
+init_cmos:
+	//lc sp,0x3FFFC
+	//系统时钟配置
+	svw 0x09000038, 0x00ff8800
+    //svw 0x09000000, 0x13044445	// 200Mhz
+	svw 0x09000000, 0x13024454 //pll1=242Mhz, pll2=40Mhz
+    svw 0x09000008, 0x400063   //flash=PLL2; music_clk=PLL2; sencor_clk=PLL2
+
+    //----------------------------------------------------------------------------	
+	//UART0 initial, 9600
+	//----------------------------------------------------------------------------
+    // svw 0x09000800 0x00400087 //波特率参数divisor=串口时钟/(16*baud_rate) 0x00400087=9600  0x0040000b=115200
+
+    svw 0x09000b00 0x10 
+    svw 0x09000b04 0x10
+    svw 0x09000b08 0
+
+    //图像输出配置-SPI-MTK 240x320
+    svw 0x09000430, 0x95000000  //连续模式
+    svw 0x09000434, 0x10000000
+    svw 0x09000438, 0x2000      //时钟反向,可以解决数据边沿和时钟采样边沿太近的问题,输出only y,缩放和剪切都不要
+    svw 0x0900043c, 0x00f00140  //240x320
+
+    //图像输出时钟使能
+    // svw 0x09000018, 2
+    svw 0x09000018, 1 //cls-music
+    hlt 10000
+
+    //I2C配置
+    svw 0x09000128, 0x3        //I2C1设备复位,I2C2设备复位
+    svw 0x09000100, 0x02410084 //I2C1使能,非DMA,I2C时钟高电平脉宽=0xfe,I2C时钟分频值=0x1fe
+    svw 0x09000104, 0xf        //I2C_dlay
+
+    // 读ID
+    svw 0x0900011c, 0xfc 
+    svw 0x09000124, 0x20016e
+    hlt 1
+    lvw r2, 0x0900011c //id r2
+
+#if (OUTPUT_240x320 == 1)
+    lc ptr1,0
+    lc r3,0x0000023B    
+    ifu r2==r3 {//bf30a2
+        lc ptr1, CMOS_INI_BF30a2
+        /**
+         * 图像输入配置
+         * 格式:only y
+         * 分辨率:240*320
+         * 存储分辨率:240*320
+         * 接口:spi-mtk
+         * 适用模组:bf30a2
+         */
+        svw 0x09000300, 0x32480000      //剪切,spi-mtk,only y,msb 
+        svw 0x09000304, 0x201           //中断使能
+        svw 0x09000308, 0xf00140        //输入分辨率
+        svw 0x0900030c, 0xf00140        //存储分辨率 240x320
+        svw 0x09000310, img_in_addr1
+        svw 0x09000318, 0               //缩放
+        svw 0x0900031c, 0x1000240       //MTK指令码
+        svw 0x09000320, 0xffffff        //MTK_sync_code 同步字
+    }
+
+    lc r3, 0x00000139    
+    ifu r2==r3 {//bf3901
+        lc ptr1, CMOS_INI_BF3901
+        /**
+         * 图像输入配置
+         * 格式:only y
+         * 分辨率:240*320
+         * 存储分辨率:240*320
+         * 接口:spi-mtk
+         * 适用模组:bf30a2
+         */
+        svw 0x09000300, 0x12000000      //剪切,spi-mtk,only y,msb 
+        svw 0x09000304, 0x201           //中断使能
+        svw 0x09000308, 0xf00140        //输入分辨率
+        svw 0x0900030c, 0xf00140        //存储分辨率 240x320
+        svw 0x09000310, img_in_addr1
+        svw 0x09000318, 0               //不缩放
+        svw 0x0900031c, 0x1004040       //MTK指令码
+        svw 0x09000320, 0xffffff        //MTK_sync_code 同步字
+    }
+
+#elif (OUTPUT_120x160 == 1)
+    lc ptr1,0
+    lc r3,0x0000023B    
+    ifu r2==r3 {//bf30a2
+        lc ptr1, CMOS_INI_BF30a2
+        /**
+         * 图像输入配置
+         * 格式:only y
+         * 分辨率:240*320
+         * 存储分辨率:120*160
+         * 接口:spi-mtk
+         * 适用模组:bf30a2
+         */
+        svw 0x09000300, 0x32480000      //剪切,spi-mtk,only y,msb 
+        svw 0x09000304, 0x201           //中断使能
+        svw 0x09000308, 0xf00140        //输入分辨率
+        svw 0x0900030c, 0x7800a0        //存储分辨率
+        svw 0x09000310, IMAGE_INPUT_ADDR0
+        svw 0x09000318, 0x11550155      //缩放
+        svw 0x0900031c, 0x1000240       //MTK指令码
+        svw 0x09000320, 0xffffff        //MTK_sync_code 同步字
+    }
+
+    lc r3, 0x00000139    
+    ifu r2==r3 {//bf3901
+        lc ptr1, CMOS_INI_BF3901
+        /**
+         * 图像输入配置
+         * 格式:yuv422->only y
+         * 分辨率:240*320
+         * 存储分辨率:120*160
+         * 接口:spi-mtk
+         * 适用模组:3901
+         */
+        svw 0x09000300, 0x12410000   //剪切,spi-mtk,yuv422,only y,msb 将CMOS输出的yuv422格式当做only y,此时宽度x2, 再每4个点取一个y, 也能实现120x160效果
+        svw 0x09000304, 0x201        //中断使能
+        svw 0x09000308, 0x1e00140    //输入分辨率
+        svw 0x0900030c, 0x07800a0    //存储分辨率 120x160
+        svw 0x09000310, IMAGE_INPUT_ADDR0
+        svw 0x09000318, 0x13010101   //不缩放
+        svw 0x0900031c, 0x01000240   //MTK指令码
+        svw 0x09000320, 0x00ffffff   //MTK_sync_code 同步字
+    }
+#endif
+
+    ifu ptr1==0 {//没找到摄像头,排查硬件
+        whileu 1==1 {
+            nop
+        }
+    }
+    
+    //配置CMOS
+    lc r0,0x0900011c
+    whileu r0 != 0 {
+        lsl r1,ptr1
+        lc r2,0xffffffff
+        ifu r1 == r2{
+            break
+        }
+        ssl r0,r1
+
+        lc r2,0x09000124
+        lc r1,0x11016e
+        sw r2,r1
+        hlt 1
+    }
+    
+    lc r30,0
+	ret

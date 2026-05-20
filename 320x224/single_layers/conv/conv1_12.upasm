@@ -1,0 +1,143 @@
+#include conv1.upinc
+
+
+#define kernel_ptr ptr0
+
+#define input_ptr r11
+#define output_ptr r10
+
+#define br0   s4
+#define br0_0 s4_0
+#define br0_1 s4_1
+#define br0_2 s4_2
+#define br0_3 s4_3
+
+#define br1   s5
+#define br1_0 s5_0
+#define br1_1 s5_1
+#define br1_2 s5_2
+#define br1_3 s5_3
+
+#define in_0 s10
+#define in_1_128 s7 	 // d10,d11
+#define in_1_64 s7_01
+
+#define k0_0  s0
+#define k0_1  d9
+#define k1_0  s1
+#define k1_1  d1
+#define k2_0  s2
+#define k2_1  d2
+#define k3_0  s3
+#define k3_1  d3
+#define k4_0  s12
+#define k4_1  d4
+#define k5_0  s14
+#define k5_1  d5
+#define k6_0  s8
+#define k6_1  d7
+#define k7_0  s9
+#define k7_1  d8	// s6不能用!
+
+#define kn_0  s11
+#define kn_1  d6
+
+// 只有layer4, 不用考虑输入stride, 需要考虑输出stride
+@export conv1_12
+conv1_12:
+
+	mov kernel_ptr conv1_kernel_adr
+	mov input_ptr conv1_in_adr
+	mov output_ptr conv1_out_adr
+
+	lm_d  k0_0  kernel_ptr
+	l64_d k0_1  kernel_ptr
+	lm_d  k1_0  kernel_ptr
+	l64_d k1_1  kernel_ptr
+	lm_d  k2_0  kernel_ptr
+	l64_d k2_1  kernel_ptr
+	lm_d  k3_0  kernel_ptr
+	l64_d k3_1  kernel_ptr
+	lm_d  k4_0  kernel_ptr
+	l64_d k4_1  kernel_ptr
+	lm_d  k5_0  kernel_ptr
+	l64_d k5_1  kernel_ptr
+	lm_d  k6_0  kernel_ptr
+	l64_d k6_1  kernel_ptr
+	lm_d  k7_0  kernel_ptr
+	l64_d k7_1  kernel_ptr
+
+	muls16 conv1_input_end conv1_w conv1_h
+	muls32 conv1_input_end conv1_input_end conv1_in_stride
+	inc conv1_input_end input_ptr
+
+	mov conv1_kernel_adr kernel_ptr
+
+	//lcs r30 0
+	//lcs r31 560
+	add64 s7_23 0 0
+	$jump_regs r20 ...
+	whileu input_ptr < conv1_input_end {
+		mov kernel_ptr conv1_kernel_adr
+		//ifu r30 == r31 {
+		//	nop
+		//}
+		//inc r30 1
+
+		lm_d br0 conv1_bias_adr
+		lm_d in_0 input_ptr 0
+		l64_d in_1_64 input_ptr 16
+		
+		simd_mac16_8 	br0_0 k0_0  in_0
+		simd_mac16_8 	br0_1 k1_0  in_0
+		simd_mac16_8 	br0_2 k2_0  in_0
+		simd_mac16_8 	br0_3 k3_0  in_0
+		simd_mac16_4 br0_0 k0_1  in_1_64
+		simd_mac16_4 br0_1 k1_1  in_1_64
+		simd_mac16_4 br0_2 k2_1  in_1_64
+		simd_mac16_4 br0_3 k3_1  in_1_64
+		lm_d br1 conv1_bias_adr 16
+		lm_d  kn_0 kernel_ptr
+
+		simd_relu d0 br0 10
+
+		simd_mac16_8 	br1_0 k4_0  in_0
+		simd_mac16_8 	br1_1 k5_0  in_0
+		simd_mac16_8 	br1_2 k6_0  in_0
+		simd_mac16_8 	br1_3 k7_0  in_0
+		simd_mac16_4 br1_0 k4_1  in_1_64
+		simd_mac16_4 br1_1 k5_1  in_1_64
+		simd_mac16_4	br1_2 k6_1  in_1_64
+		simd_mac16_4	br1_3 k7_1  in_1_64
+		l64_d kn_1 kernel_ptr
+		s64 output_ptr d0 0
+
+		simd_relu d0 br1 10
+		lm_d br0 conv1_bias_adr 32
+		s64 output_ptr d0 8
+
+		simd_mac16_8 	br0_0 kn_0  in_0
+		lm_d  kn_0 kernel_ptr
+		simd_mac16_4	br0_0 kn_1  in_1_64
+		l64_d kn_1 kernel_ptr
+		simd_mac16_8 	br0_1 kn_0  in_0
+		lm_d  kn_0 kernel_ptr
+		simd_mac16_4	br0_1 kn_1  in_1_64
+		l64_d kn_1 kernel_ptr
+		simd_mac16_8 	br0_2 kn_0  in_0
+		lm_d  kn_0 kernel_ptr
+		simd_mac16_4 br0_2 kn_1  in_1_64
+		l64_d kn_1 kernel_ptr
+		simd_mac16_8 	br0_3 kn_0  in_0
+		nop
+		simd_mac16_4 br0_3 kn_1  in_1_64
+		nop
+		inc input_ptr conv1_in_stride
+		simd_relu d0 br0 10
+		s64 output_ptr d0 16
+
+		inc output_ptr conv1_out_stride
+	}
+	$jump_regs end
+	
+	ret

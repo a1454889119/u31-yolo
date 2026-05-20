@@ -1,0 +1,86 @@
+
+// 8*8的kernel可以一次性读进寄存器
+$func conv1_8in_8out_whc(in input, in output, in kernels, in width_x_height) {
+#define b_03 s4
+#define b_47 s5
+#define b0 s4_0
+#define b1 s4_1
+#define b2 s4_2
+#define b3 s4_3
+#define b4 s5_0
+#define b5 s5_1
+#define b6 s5_2
+#define b7 s5_3	
+#define k0 s0
+#define k1 s1
+#define k2 s2
+#define k3 s3
+#define k4 s6
+#define k5 s7
+#define k6 s8
+#define k7 s9
+#define in0 s10
+#define outptr ptr0
+#define inptr ptr1
+#define kptr ptr2
+	reg i, j, wxh, badr, outadr
+	reg rj0(j)
+	nop
+	load_reg kptr kernels
+	load_reg inptr input
+	load_reg outadr output
+	load_reg wxh width_x_height
+
+	// 设置ptr0偏移值为wxh*2
+	add i wxh wxh
+	lc j 0x10000
+	or i i j
+	svw 0x09000058, i
+	nop
+	
+	lm_d k0 kptr
+	lm_d k1 kptr
+	lm_d k2 kptr
+	lm_d k3 kptr
+	lm_d k4 kptr
+	lm_d k5 kptr
+	lm_d k6 kptr
+	lm_d k7 kptr
+	mov badr kptr
+
+	lcs i 0
+	$jump_regs rj0
+	whileu i < wxh {
+		lm_d b_03 badr
+		lm_d b_47 badr, 16
+		lm_d in0 inptr
+		mov outptr outadr
+
+		simd_mac16_8 b0 k0 in0
+		simd_mac16_8 b1 k1 in0
+		simd_mac16_8 b2 k2 in0
+		simd_mac16_8 b3 k3 in0
+		simd_mac16_8 b4 k4 in0
+		simd_mac16_8 b5 k5 in0
+		simd_mac16_8 b6 k6 in0
+		simd_mac16_8 b7 k7 in0
+
+		simd_leaky d0 b_03 10
+		inc outadr 2
+		simd_leaky d1 b_47 10
+
+		ssl outptr d0_lo
+		ss  outptr d0_lo
+		ssl outptr d0_hi
+		ss  outptr d0_hi
+		ssl outptr d1_lo
+		ss  outptr d1_lo
+		ssl outptr d1_hi
+		ss  outptr d1_hi
+		inc i 1
+	}
+	$jump_regs end
+	// ptr0 偏移值写回0
+	svw 0x09000058 0
+	nop
+}

@@ -1,0 +1,45 @@
+#BUILD-INFO
+TYPE=APP
+NAME=spi_cmos_test
+CFG=u31
+ENTRY_NAME=entry
+
+#DEBUG-INFO
+DEBUG_TYPE=IIC
+SIMULATE_DATA=simdata
+
+#OUTPUT-INFO
+PATH=out
+BIN=true
+HEX=true
+MAP=false
+OBJS=false
+
+#FILES
+[ext]upinc
+[ext]upasm
+
+#EXCLUDE
+[dir]out
+[dir]test
+yolo_single_frame.upasm
+yolo_multi_frame.upasm
+spi_test.upasm
+
+#MACROS
+#define WAIT_LAYER_0 1
+#define RECT_ADR_START 	0x18FFC
+#define RECT_ADR_END	0x20D00
+#define PSRAM_PARAM_ADR 0x0
+#define PSRAM_GROUP12_B_ADR 0x25A40
+#define PSRAM_FRAME_0 0x2C340
+#define PSRAM_IMAGE_0 0x2E140
+#define PSRAM_FRAME_1 0x64740
+#define PSRAM_IMAGE_1 0x66540
+#define PSRAM_LAYER_0_OUTPUT 0x9CB40
+#define PSRAM_LAYER_0_INPUT 0x72340
+#define ENABLE_SPI_OUT 1
+
+
+#GENERATION
+PREFIX=u31_sys

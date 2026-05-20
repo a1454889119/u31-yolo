@@ -1,0 +1,10 @@
+@import LAYER_38_OUTPUT
+@import LAYER_37_OUTPUT
+@import LAYER_35_OUTPUT
+
+$func mul_20x15_whc(in input0, in input1, in output, in channels)
+
+entry:
+	mul_20x15_whc(LAYER_35_OUTPUT, LAYER_37_OUTPUT, LAYER_38_OUTPUT, 24)
+
+	hlt

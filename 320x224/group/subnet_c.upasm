@@ -1,0 +1,206 @@
+#include layer_io_size.upinc
+#include memory_layout.upinc
+#include conv1.upinc
+#include dwconv.upinc
+
+@import conv1_36
+@import conv1_36_6
+@import conv1_36_12
+@import conv1_36_whc
+@import dwconv5
+
+@import tmp_rp_adr0
+@import tmp_rp_adr1
+
+@export group18
+@export group19
+
+#define t0 r20
+#define t1 r21
+
+
+
+subnet_c_params:
+.word 0 // w
+.word 0 // h
+.word 0 // last cx2
+.word 0 // last func
+subnet_c_io_addr:
+.word 0 0 0 0 
+subnet_c_kb_addr:
+.word 0 0 0 0 0 0 0 0 0 0
+
+group18:
+	sv tmp_rp_adr0 rp
+	lcs ptr0 subnet_c_params
+	nop
+
+	sw ptr0 10
+	sw ptr0 7
+	sw ptr0 12
+	sv ptr0 conv1_36_6
+	svw ptr0, SUBNET_C_10X7_ADDR_E
+	svw ptr0, SUBNET_C_10X7_ADDR_D
+	svw ptr0, SUBNET_C_10X7_ADDR_C
+	svw ptr0, SUBNET_C_10X7_ADDR_B
+	svw ptr0, LAYER_109_KERNEL_ADDR
+	svw ptr0, LAYER_109_BIAS_ADDR
+	svw ptr0, LAYER_110_KERNEL_ADDR
+	svw ptr0, LAYER_110_BIAS_ADDR
+	svw ptr0, LAYER_111_KERNEL_ADDR
+	svw ptr0, LAYER_111_BIAS_ADDR
+	svw ptr0, LAYER_112_KERNEL_ADDR
+	svw ptr0, LAYER_112_BIAS_ADDR
+	svw ptr0, LAYER_113_KERNEL_ADDR
+	svw ptr0, LAYER_113_BIAS_ADDR
+	call subnet_c
+
+	lcs ptr0 subnet_c_params
+	inc ptr0 8
+	nop
+	sw ptr0 24
+	svw ptr0 conv1_36_12
+	svw ptr0, SUBNET_C_10X7_ADDR_E
+	svw ptr0, SUBNET_C_10X7_ADDR_D
+	svw ptr0, SUBNET_C_10X7_ADDR_C
+	svw ptr0, SUBNET_C_10X7_ADDR_A
+	svw ptr0, LAYER_117_KERNEL_ADDR
+	svw ptr0, LAYER_117_BIAS_ADDR
+	svw ptr0, LAYER_118_KERNEL_ADDR
+	svw ptr0, LAYER_118_BIAS_ADDR
+	svw ptr0, LAYER_119_KERNEL_ADDR
+	svw ptr0, LAYER_119_BIAS_ADDR
+	svw ptr0, LAYER_120_KERNEL_ADDR
+	svw ptr0, LAYER_120_BIAS_ADDR
+	svw ptr0, LAYER_121_KERNEL_ADDR
+	svw ptr0, LAYER_121_BIAS_ADDR
+	call subnet_c
+
+	lv rp tmp_rp_adr0
+	ret
+	
+group19:
+	sv tmp_rp_adr0 rp
+	lcs ptr0 subnet_c_params
+	nop
+
+	sw ptr0 20
+	sw ptr0 14
+	sw ptr0 12
+	sv ptr0 conv1_36_6
+	svw ptr0, SUBNET_C_20X14_ADDR_E
+	svw ptr0, SUBNET_C_20X14_ADDR_D
+	svw ptr0, SUBNET_C_20X14_ADDR_C
+	svw ptr0, SUBNET_C_20X14_ADDR_B
+	svw ptr0, LAYER_94_KERNEL_ADDR
+	svw ptr0, LAYER_94_BIAS_ADDR
+	svw ptr0, LAYER_95_KERNEL_ADDR
+	svw ptr0, LAYER_95_BIAS_ADDR
+	svw ptr0, LAYER_96_KERNEL_ADDR
+	svw ptr0, LAYER_96_BIAS_ADDR
+	svw ptr0, LAYER_97_KERNEL_ADDR
+	svw ptr0, LAYER_97_BIAS_ADDR
+	svw ptr0, LAYER_98_KERNEL_ADDR
+	svw ptr0, LAYER_98_BIAS_ADDR
+	call subnet_c
+
+	lcs ptr0 subnet_c_params
+	inc ptr0 8
+	nop
+	sw ptr0 24
+	sv ptr0 conv1_36_12
+	svw ptr0, SUBNET_C_20X14_ADDR_E
+	svw ptr0, SUBNET_C_20X14_ADDR_D
+	svw ptr0, SUBNET_C_20X14_ADDR_C
+	svw ptr0, SUBNET_C_20X14_ADDR_A
+	svw ptr0, LAYER_102_KERNEL_ADDR
+	svw ptr0, LAYER_102_BIAS_ADDR
+	svw ptr0, LAYER_103_KERNEL_ADDR
+	svw ptr0, LAYER_103_BIAS_ADDR
+	svw ptr0, LAYER_104_KERNEL_ADDR
+	svw ptr0, LAYER_104_BIAS_ADDR
+	svw ptr0, LAYER_105_KERNEL_ADDR
+	svw ptr0, LAYER_105_BIAS_ADDR
+	svw ptr0, LAYER_106_KERNEL_ADDR
+	svw ptr0, LAYER_106_BIAS_ADDR
+	call subnet_c
+
+	lv rp tmp_rp_adr0
+	ret
+
+subnet_c:
+	sv tmp_rp_adr1 rp
+
+	lcs t0 subnet_c_params
+	lw dwconv_in_w t0 0
+	lw dwconv_in_h t0 4
+	mov dwconv_out_w dwconv_in_w
+	mov dwconv_out_h dwconv_in_h
+	lcs dwconv_c 36
+	lcs t0 subnet_c_io_addr
+	lw dwconv_in_adr t0 0
+	lw dwconv_out_adr t0 4
+	lcs t0 subnet_c_kb_addr
+	lw dwconv_kernel_adr t0 0
+	lw dwconv_bias_adr t0 4
+	call dwconv5
+
+	lcs t0 subnet_c_params
+	lw conv1_w t0 0
+	lw conv1_h t0 4
+	// 输入36通道, 输出36通道
+	lcs conv1_in_stride 72
+	lcs conv1_out_stride 72
+	lcs t0 subnet_c_io_addr
+	lw conv1_in_adr t0 4
+	lw conv1_out_adr t0 8
+	lcs t0 subnet_c_kb_addr
+	lw conv1_kernel_adr t0 8
+	lw conv1_bias_adr t0 12
+	call conv1_36_whc
+
+	lcs t0 subnet_c_params
+	lw dwconv_in_w t0 0
+	lw dwconv_in_h t0 4
+	mov dwconv_out_w dwconv_in_w
+	mov dwconv_out_h dwconv_in_h
+	lcs dwconv_c 36
+	lcs t0 subnet_c_io_addr
+	lw dwconv_in_adr t0 8
+	lw dwconv_out_adr t0 4
+	lcs t0 subnet_c_kb_addr
+	lw dwconv_kernel_adr t0 16
+	lw dwconv_bias_adr t0 20
+	call dwconv5
+
+	lcs t0 subnet_c_params
+	lw conv1_w t0 0
+	lw conv1_h t0 4
+	// 输入36通道, 输出36通道
+	lcs conv1_in_stride 72
+	lcs conv1_out_stride 72
+	lcs t0 subnet_c_io_addr
+	lw conv1_in_adr t0 4
+	lw conv1_out_adr t0 8
+	lcs t0 subnet_c_kb_addr
+	lw conv1_kernel_adr t0 24
+	lw conv1_bias_adr t0 28
+	call conv1_36
+
+	lcs t0 subnet_c_params
+	lw conv1_w t0 0
+	lw conv1_h t0 4
+	// 输入36通道, 输出从参数读
+	lcs conv1_in_stride 72
+	lw conv1_out_stride t0 8
+	lw t1 t0 12 // 读函数地址
+	lcs t0 subnet_c_io_addr
+	lw conv1_in_adr t0 8
+	lw conv1_out_adr t0 12
+	lcs t0 subnet_c_kb_addr
+	lw conv1_kernel_adr t0 32
+	lw conv1_bias_adr t0 36
+	call t1
+
+	lv rp tmp_rp_adr1
+	ret

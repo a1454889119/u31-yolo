@@ -1,0 +1,9 @@
+@import LAYER_1_OUTPUT
+@import LAYER_2_OUTPUT
+@import layer2_kernel
+
+$func conv3s2_linear_cwh(in input, in output, in channels, in kernels, in dstw, in dsth)
+
+entry:
+	conv3s2_linear_cwh(LAYER_1_OUTPUT, LAYER_2_OUTPUT, 8, layer2_kernel, 40, 30)
+	hlt

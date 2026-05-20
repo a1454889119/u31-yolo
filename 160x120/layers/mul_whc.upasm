@@ -1,0 +1,73 @@
+
+
+#define outptr ptr0
+#define inptr0 ptr1
+#define inptr1 ptr2
+
+#define process_8 \
+	simd_muls16 s0 s6_01 s7_01; \
+	simd_linear d0 s0 10; \
+	s64 outptr d0; \
+	simd_muls16 s1 s6_23 s7_23; \
+	lm_d s6 inptr0; \
+	simd_linear d0 s1 10; \
+	s64 outptr d0;
+
+$func mul_20x16_whc(in input0, in input1, in output, in channels) {
+	reg i, c, v, rj0
+	lcs i 0
+	load_reg inptr0, input0
+	load_reg inptr1, input1
+	load_reg outptr, output
+	load_reg c, channels
+
+	$jump_regs rj0
+	whileu i < c {
+		lsl v inptr1
+		simd_ext16 s7 v 0
+
+		lm_d s6 inptr0
+
+		// 一组处理8个数据, 一共20*16=320个数据, 320/8=40次
+		repeat_sta 8
+repeat_5:
+			process_8
+			process_8
+			process_8
+			process_8
+			process_8
+		repeat_end repeat_5
+		sub inptr0 inptr0 16
+		inc i 1
+	}
+	$jump_regs end
+}
+
+
+$func mul_40x32_whc(in input0, in input1, in output, in channels) {
+	reg i, c, v, rj0
+	lcs i 0
+	load_reg inptr0, input0
+	load_reg inptr1, input1
+	load_reg outptr, output
+	load_reg c, channels
+
+	$jump_regs rj0
+	whileu i < c {
+		lsl v inptr1
+		simd_ext16 s7 v 0
+
+		lm_d s6 inptr0
+		// 一组处理8个数据, 一共40*32=1280个数据, 1280/8=160次
+		repeat_sta 40
+repeat_4:
+			process_8
+			process_8
+			process_8
+			process_8
+		repeat_end repeat_4
+		sub inptr0 inptr0 16
+		inc i 1
+	}
+	$jump_regs end
+}

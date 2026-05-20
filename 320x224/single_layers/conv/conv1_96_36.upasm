@@ -1,0 +1,106 @@
+#include conv1.upinc
+
+#define output_ptr ptr0
+#define kernel_ptr ptr1
+#define input_ptr ptr2
+#define bias_ptr ptr3
+
+#define in_ptr r10
+#define out_ptr r11
+#define bias_end r13
+#define bres r14
+
+#define in_0 s0
+#define in_1 s1
+#define in_2 s2
+#define in_3 s3
+#define in_4 s4
+#define in_5 s5
+#define in_6 s6
+#define in_7 s7
+#define in_8 s8
+#define in_9 s9
+#define in_10 s10
+#define in_11 s11
+
+#define k0 s12
+#define k1 s13
+#define k2 s14
+#define k3 s15
+
+@export conv1_96_36
+conv1_96_36:
+	mov input_ptr conv1_in_adr
+	mov out_ptr conv1_out_adr
+
+	lcs bias_end, 36*4
+	inc bias_end conv1_bias_adr
+	muls16 conv1_input_end conv1_w conv1_h
+	muls32 conv1_input_end conv1_input_end conv1_in_stride
+	inc conv1_input_end input_ptr
+
+	muls16 conv1_out_stride conv1_w conv1_h
+	sl conv1_out_stride conv1_out_stride 1
+	bit_set conv1_out_stride conv1_out_stride 16
+	sv PTR0_OFFSET_ADR conv1_out_stride
+
+	$jump_regs r20 r21
+	whileu input_ptr < conv1_input_end {
+
+		lm_d in_0  input_ptr
+		lm_d in_1  input_ptr
+		lm_d in_2  input_ptr
+		lm_d in_3  input_ptr
+		lm_d in_4  input_ptr
+		lm_d in_5  input_ptr
+		lm_d in_6  input_ptr
+		lm_d in_7  input_ptr
+		lm_d in_8  input_ptr
+		lm_d in_9  input_ptr
+		lm_d in_10 input_ptr
+		lm_d in_11 input_ptr
+
+		mov output_ptr out_ptr
+		mov bias_ptr conv1_bias_adr
+		mov kernel_ptr conv1_kernel_adr
+
+		whileu bias_ptr < bias_end {
+			lw bres bias_ptr
+
+			lm_d k0 kernel_ptr;
+			simd_mac16_8 bres in_0 k0;
+			lm_d k1 kernel_ptr;
+			simd_mac16_8 bres in_1 k1;
+			lm_d k2 kernel_ptr;
+			simd_mac16_8 bres in_2 k2;
+			lm_d k3 kernel_ptr;
+			simd_mac16_8 bres in_3 k3;
+
+			lm_d k0 kernel_ptr;
+			simd_mac16_8 bres in_4 k0;
+			lm_d k1 kernel_ptr;
+			simd_mac16_8 bres in_5 k1;
+			lm_d k2 kernel_ptr;
+			simd_mac16_8 bres in_6 k2;
+			lm_d k3 kernel_ptr;
+			simd_mac16_8 bres in_7 k3;
+
+			lm_d k0 kernel_ptr;
+			simd_mac16_8 bres in_8  k0;
+			lm_d k1 kernel_ptr;
+			simd_mac16_8 bres in_9  k1;
+			lm_d k2 kernel_ptr;
+			simd_mac16_8 bres in_10 k2;
+			lm_d k3 kernel_ptr;		
+			simd_mac16_8 bres in_11 k3;
+			nop
+
+			relu bres bres 10
+			ssl output_ptr bres	
+		}
+		inc out_ptr 2
+	}
+	$jump_regs end
+	sv PTR0_OFFSET_ADR 0
+
+	ret

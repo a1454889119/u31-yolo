@@ -1,0 +1,64 @@
+//---------------LAYER 1(conv)-------------
+//input:88x44x8
+//output:88x44x8
+//k3s1p1,group=8
+//leaky
+#include "window_param.upinc"
+
+#import layer_1_input
+#import layer_2_input
+
+#import conv_params
+#import conv_grouped_k3snp1
+
+// 3x3分组卷积
+layer_1:
+
+	// conv_params:
+	// .word 0 // VDMA1_PARAM0
+	// .word 0 // VDMA1_PARAM1
+	// .word 0 // VDMA1_PARAM2
+	// .word 0 // VDMA1_PARAM3
+	// .word 0 // input_wh_x2
+	// .word 0 // output_whc_x2
+	// .word 0 // c
+	// .word 0 // input_adr
+	// .word 0 // output_adr
+	// .word 0 // kernel_adr
+	// .word 0 // bias_adr
+	lcs ptr0 conv_params	
+	svw ptr0 VDMA1_PARAM_0
+	svw ptr0 VDMA1_PARAM_1
+	svw ptr0 VDMA1_PARAM_2
+	svw ptr0 VDMA1_PARAM_3
+	sv  ptr0 7744 	// input_wh_x2:88*44*2
+	svw ptr0 61952 	// output_whc_x2:88*44*8*2
+	sv  ptr0 8 		// c:8
+	sv  ptr0 layer_1_input
+	sv  ptr0 layer_2_input
+	sv  ptr0 layer_1_kernels
+	sv  ptr0 layer_1_biases
+	call conv_grouped_k3snp1
+
+	ret
+
+layer_1_biases:
+.word 0xffe90000 0x00178400 0x0024ec00 0x000ce800 
+.word 0x001b9000 0x0010c400 0x00129c00 0x0000fc00 
+layer_1_kernels:
+.short 0x044d 0xf83d 0x005a 0xfe7c 0xf985 0x0051 0xfc13 0x1547 
+.short 0xfd40 0 0 0 0 0 0 0
+.short 0xffb4 0xff9d 0x0028 0x071e 0xedce 0x01c5 0x01a3 0x0252 
+.short 0x00a9 0 0 0 0 0 0 0 
+.short 0x0134 0xfea5 0x006b 0x0155 0xf76c 0x0078 0xffc3 0x001c 
+.short 0x0035 0 0 0 0 0 0 0
+.short 0xfffc 0xff37 0x0015 0xff28 0x054d 0x0030 0xffbc 0x00ba 
+.short 0xff92 0 0 0 0 0 0 0
+.short 0x0050 0x025a 0xfe8d 0xfd8a 0xfd9b 0xfe16 0x00ed 0x0434 
+.short 0x00b9 0 0 0 0 0 0 0
+.short 0x0003 0xff87 0x0078 0x0601 0xf47c 0x006f 0xffb9 0x00fa 
+.short 0x0073 0 0 0 0 0 0 0
+.short 0x00a9 0x0211 0x00ba 0x019f 0xf418 0x0167 0x0038 0x0281 
+.short 0x0023 0 0 0 0 0 0 0
+.short 0xfe02 0xfd36 0x02bd 0x003e 0xfe2d 0xfb5e 0x004a 0x0748 
+.short 0x00e5 0 0 0 0 0 0 0

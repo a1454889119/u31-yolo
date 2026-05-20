@@ -1,0 +1,233 @@
+#include layer_param.upinc
+#include layer_regs.upinc
+
+#define b_03 s4
+#define b_47 s5
+#define b0 s4_0
+#define b1 s4_1
+#define b2 s4_2
+#define b3 s4_3
+#define b4 s5_0
+#define b5 s5_1
+#define b6 s5_2
+#define b7 s5_3	
+#define k0 s0
+#define k1 s1
+#define k2 s2
+#define k3 s3
+#define k4 s10
+#define k5 s11
+#define k6 s8
+#define k7 s9
+#define in16 s6
+#define in16_p0 s6_01
+#define in16_p1 s6_23
+#define in8 s7
+#define in8_03 s7_01
+#define in8_47 s7_23
+
+#define ktmp s12
+#define kscale s13
+#define kzero_point s14
+
+#define kptr ptr2
+
+#define bstart r13
+#define i r15
+#define rj0 r16
+#define rj1 r17
+
+calc_8_out:
+	lm_d b_03 badr
+	lm_d b_47 badr, 16
+
+	lm_d k0 kptr
+	lm_d k1 kptr
+	lm_d k2 kptr
+	lm_d k3 kptr
+	lm_d k4 kptr
+	lm_d k5 kptr
+	lm_d k6 kptr
+	lm_d k7 kptr
+
+	simd_mac16_8 b0 k0 in8
+	simd_mac16_8 b1 k1 in8
+	simd_mac16_8 b2 k2 in8
+	simd_mac16_8 b3 k3 in8
+	simd_mac16_8 b4 k4 in8
+	simd_mac16_8 b5 k5 in8
+	simd_mac16_8 b6 k6 in8
+	simd_mac16_8 b7 k7 in8
+
+	simd_leaky d0 b_03 layer_mulshift
+	inc badr 32
+	simd_leaky d1 b_47 layer_mulshift
+
+	simd_16to32 b_03 d0
+	simd_16to32 b_47 d1
+
+	simd_i32f32 b_03 b_03 31
+	simd_i32f32 b_47 b_47 31
+
+	simd_fmul b_03 b_03 kscale
+	simd_fmul b_47 b_47 kscale
+
+	simd_fsub b_03 b_03 kzero_point
+	simd_fsub b_47 b_47 kzero_point
+	// 浮点数round
+	simd_f32i32 ktmp b_03 30
+	simd_f32i32 b_03 b_03 31
+	simd_sub32 b_03 ktmp b_03
+	simd_f32i32 ktmp b_47 30
+	simd_f32i32 b_47 b_47 31
+	simd_sub32 b_47 ktmp b_47
+
+	simd_shuffle8 b_03 b_03 d2
+	simd_shuffle8 b_47 b_47 d2
+	sw outptr b0
+	sw outptr b4
+	ret
+
+
+@export conv1_8in_24out_cwh
+conv1_8in_24out_cwh:
+	push rp
+	mov bstart badr
+	mov outptr outadr
+	mov inptr inadr
+	mov kptr kadr
+	simd_ext32 kscale layer_scale
+	simd_ext32 kzero_point layer_zeropt
+	sub outstride outstride 24
+
+	lcs i 0
+	$jump_regs rj0 rj1
+	whileu i < outwxh {
+		lm_d in16 inptr
+		mov badr bstart
+		mov kptr kadr
+		simd_8to16 in8 in16_p0
+		call calc_8_out
+		call calc_8_out
+		call calc_8_out
+		inc outptr outstride
+
+		mov badr bstart
+		mov kptr kadr
+		simd_8to16 in8 in16_p1
+		call calc_8_out
+		call calc_8_out
+		call calc_8_out
+		
+		inc outptr outstride
+		inc i 2
+	}
+	$jump_regs end
+	pop rp
+	ret
+
+/*
+#define outptr ptr0
+#define inptr ptr1
+#define kptr ptr2
+$func conv1_8in_24out_cwh() {
+	reg i, j, wxh, badr, bstart, kadr, outs
+	reg rj0, rj1, scale, zero_pt, mulshift
+	reg param_ptr(rj0)
+	jmp conv_start
+calc_8_out:
+	lm_d b_03 badr
+	lm_d b_47 badr, 16
+
+	lm_d k0 kptr
+	lm_d k1 kptr
+	lm_d k2 kptr
+	lm_d k3 kptr
+	lm_d k4 kptr
+	lm_d k5 kptr
+	lm_d k6 kptr
+	lm_d k7 kptr
+
+	simd_mac16_8 b0 k0 in8
+	simd_mac16_8 b1 k1 in8
+	simd_mac16_8 b2 k2 in8
+	simd_mac16_8 b3 k3 in8
+	simd_mac16_8 b4 k4 in8
+	simd_mac16_8 b5 k5 in8
+	simd_mac16_8 b6 k6 in8
+	simd_mac16_8 b7 k7 in8
+
+	simd_leaky d0 b_03 mulshift
+	inc badr 32
+	simd_leaky d1 b_47 mulshift
+
+	simd_16to32 b_03 d0
+	simd_16to32 b_47 d1
+
+	simd_i32f32 b_03 b_03 31
+	simd_i32f32 b_47 b_47 31
+
+	simd_fmul b_03 b_03 kscale
+	simd_fmul b_47 b_47 kscale
+
+	simd_fsub b_03 b_03 kzero_point
+	simd_fsub b_47 b_47 kzero_point
+	// 浮点数round
+	simd_f32i32 ktmp b_03 30
+	simd_f32i32 b_03 b_03 31
+	simd_sub32 b_03 ktmp b_03
+	simd_f32i32 ktmp b_47 30
+	simd_f32i32 b_47 b_47 31
+	simd_sub32 b_47 ktmp b_47
+
+	simd_shuffle8 b_03 b_03 d2
+	simd_shuffle8 b_47 b_47 d2
+	sw outptr b0
+	sw outptr b4
+
+	ret
+
+conv_start:
+	lcs d2_lo 0xc840
+	lc param_ptr, LAYER_PARAM_ADDR
+	lw inptr param_ptr, INPUT_ADDR_OFF
+	lw outptr param_ptr, OUTPUT_ADDR_OFF
+	lw bstart param_ptr, BIAS_ADDR_OFF
+	lw scale param_ptr, SCALE_OFF
+	lw zero_pt param_ptr, ZERO_POINT_OFF
+	lw mulshift param_ptr, MUL_SHIFT_OFF
+	lw wxh param_ptr, OUTW_OFF
+	lw i param_ptr, OUTH_OFF
+	muls16 wxh wxh i
+	lw kadr param_ptr, KERNEL_ADDR_OFF
+	lw outs param_ptr, OUT_STRIDE_OFF
+
+	simd_ext32 kscale scale
+	simd_ext32 kzero_point zero_pt
+	sub outs outs 24
+
+	lcs i 0
+	$jump_regs rj0 rj1
+	whileu i < wxh {
+		lm_d in16 inptr
+		mov badr bstart
+		mov kptr kadr
+		simd_8to16 in8 in16_p0
+		call calc_8_out
+		call calc_8_out
+		call calc_8_out
+		inc outptr outs
+
+		mov badr bstart
+		mov kptr kadr
+		simd_8to16 in8 in16_p1
+		call calc_8_out
+		call calc_8_out
+		call calc_8_out
+		
+		inc outptr outs
+		inc i 2
+	}
+	$jump_regs end
+}
+*/

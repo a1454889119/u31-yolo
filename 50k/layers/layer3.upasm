@@ -1,0 +1,135 @@
+//---------------LAYER 3(conv)-------------
+//input:88x44x4
+//output:88x44x18
+//k1s1p0,group=1
+//leaky
+#include "layers_common.upinc"
+
+#define input_ptr ptr0
+#define kernel_ptr ptr2
+
+#define wh r3
+#define i r4
+#define wh_x2 r5
+#define wh_x4 r6
+#define wh_x6 r7
+#define wh_x8 r8
+#define wh_x10 r9
+#define wh_x12 r10
+#define wh_x14 r11
+#define wh_x16 r12
+
+#define input_end r13
+#define input_start r14
+#define output_ptr r15
+
+#define bias_ptr r16
+#define br2 r17
+
+#define tmp0 r18
+#define tmp1 r19
+
+#define in0 d2
+
+#define br0 s4
+#define br0_0 s4_0
+#define br0_1 s4_1
+#define br0_2 s4_2
+#define br0_3 s4_3
+
+#define br1 s5
+#define br1_0 s5_0
+#define br1_1 s5_1
+#define br1_2 s5_2
+#define br1_3 s5_3
+
+#define k0 d3
+#define k1 d4
+#define k2 d5
+#define k3 d6
+#define k4 d7
+#define k5 d8
+#define k6 d9
+#define k7 d10
+#define k8 d11
+
+@export layer_3
+layer_3:
+	// 假设:d8/d9映射到s6 
+	lcs input_ptr layer_2_output
+	lc output_ptr layer_3_output
+
+	lcs wh 3872 // 88*44
+	sl wh_x2 wh 1
+	sl wh_x4 wh 2
+	sl wh_x8 wh 3
+	sl wh_x16 wh 4
+	add wh_x6 wh_x2 wh_x4
+	add wh_x10 wh_x8 wh_x2
+	sl wh_x12 wh_x6 1
+	add wh_x14 wh_x8 wh_x6
+	mov input_start input_ptr
+	add input_end input_start wh_x8
+
+	mov bias_ptr bias_addr
+	mov kernel_ptr kernel_addr
+
+	lcs i 0
+	// 2轮, 每轮得到9个输出通道
+	$jump_regs r20 r21 ...
+	whileu i < 2 {
+		mov input_ptr input_start
+		l64 k0 kernel_ptr
+		l64 k1 kernel_ptr
+		l64 k2 kernel_ptr
+		l64 k3 kernel_ptr
+		l64 k4 kernel_ptr
+		l64 k5 kernel_ptr
+		l64 k6 kernel_ptr
+		l64 k7 kernel_ptr
+		l64 k8 kernel_ptr
+
+		//lcs tmp1 0xffe0
+		
+		whileu input_ptr < input_end {
+			l64 in0 input_ptr
+			lm br0 bias_ptr
+			lm br1 bias_ptr 16
+			lw br2 bias_ptr 32
+
+			simd_mac16_4 br0_0 in0 k0
+			simd_mac16_4 br0_1 in0 k1
+			simd_mac16_4 br0_2 in0 k2
+			simd_mac16_4 br0_3 in0 k3
+			simd_mac16_4 br1_0 in0 k4
+			simd_mac16_4 br1_1 in0 k5
+			simd_mac16_4 br1_2 in0 k6
+			simd_mac16_4 br1_3 in0 k7
+			simd_mac16_4 br2   in0 k8
+			nop
+			
+			simd_leaky d0 br0 10
+			simd_leaky d1 br1 10
+
+			ssl output_ptr d0_lo 0
+			ss  output_ptr d0_lo wh_x2
+			ssl output_ptr d0_hi wh_x4
+			ss  output_ptr d0_hi wh_x6
+
+			leaky br2 br2 10
+
+
+			ssl output_ptr d1_lo wh_x8
+			ss  output_ptr d1_lo wh_x10
+			ssl output_ptr d1_hi wh_x12
+			ss  output_ptr d1_hi wh_x14
+			ssl output_ptr br2   wh_x16
+
+			inc output_ptr 2
+		}
+		inc output_ptr wh_x16
+		inc bias_ptr 36
+		inc i 1
+	}
+	$jump_regs end
+	ret
