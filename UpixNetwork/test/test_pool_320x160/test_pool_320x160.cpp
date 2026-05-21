@@ -4,7 +4,7 @@
 #include <UpixNetwork/Layers/UpixBaseLayer.h>
 #include <UpixNetwork/UpixNetwork.h>
 #include <UpixNetwork/TargetDecoder.h>
-
+#include <fstream>
 #define CV_VERSION_ID       CVAUX_STR(CV_MAJOR_VERSION) CVAUX_STR(CV_MINOR_VERSION) CVAUX_STR(CV_SUBMINOR_VERSION)
 
 #ifdef _DEBUG
@@ -106,7 +106,22 @@ static void draw_rects(UpixNetwork* net, cv::Mat& img, int color_idx)
 			r.y += (img.rows - 160) / 2;
 		}
 		cv::rectangle(img, r, COLORS[tar.type + color_idx]);
-		printf("type%d, score%g\n", tar.type, tar.score);
+		char label[128];
+		sprintf_s(label, "F type%d %.2f", tar.type, tar.score);
+		cv::putText(img, label, cv::Point(r.x, std::max(0, r.y - 4)),
+			cv::FONT_HERSHEY_SIMPLEX, 0.4, COLORS[tar.type + color_idx], 1);
+		printf("type%d, score%.6f, x:%.2f, y:%.2f, w:%.2f, h:%.2f, left:%.2f, top:%.2f, right:%.2f, bottom:%.2f\n",
+			tar.type,
+			tar.score,
+			tar.x,
+			tar.y,
+			tar.w,
+			tar.h,
+			tar.x - tar.w * 0.5f,
+			tar.y - tar.h * 0.5f,
+			tar.x + tar.w * 0.5f,
+			tar.y + tar.h * 0.5f
+		);
 	}
 }
 
@@ -128,7 +143,22 @@ static void draw_rects_int(UpixNetwork* net, cv::Mat& img, int color_idx)
 			r.y += (img.rows - 160) / 2;
 		}
 		cv::rectangle(img, r, COLORS[tar.type + color_idx]);
-		printf("type%d, score%g\n", tar.type, tar.score);
+		char label[128];
+		sprintf_s(label, "I type%d %.2f", tar.type, tar.score);
+		cv::putText(img, label, cv::Point(r.x, std::max(0, r.y - 4)),
+			cv::FONT_HERSHEY_SIMPLEX, 0.4, COLORS[tar.type + color_idx], 1);
+		printf("type%d, score%.6f, x:%.2f, y:%.2f, w:%.2f, h:%.2f, left:%.2f, top:%.2f, right:%.2f, bottom:%.2f\n",
+			tar.type,
+			tar.score,
+			tar.x,
+			tar.y,
+			tar.w,
+			tar.h,
+			tar.x - tar.w * 0.5f,
+			tar.y - tar.h * 0.5f,
+			tar.x + tar.w * 0.5f,
+			tar.y + tar.h * 0.5f
+		);
 	}
 }
 
@@ -353,7 +383,7 @@ static void dump_int_result(UpixNetwork& netq, const char* outpath)
 
 static void test_pool_320x160()
 {
-	cv::Mat img = cv::imread(DATA_PATH"20260410_090428.png");
+	cv::Mat img = cv::imread(DATA_PATH"pool.png");
 	cv::resize(img, img, cv::Size(320, 160));
 	//dump_bin(DATA_PATH"pool.png", 320, 160, "pool_320x160.bin");
 
@@ -379,8 +409,25 @@ static void test_pool_320x160()
 
 		//dump_int_result(netq, "output_int");
 
-		draw_rects(&net, img, 0);		
-		draw_rects_int(&netq, img, 4);
+		cv::Mat img_float = img.clone();
+		cv::Mat img_int = img.clone();
+		cv::Mat img_both = img.clone();
+
+		draw_rects(&net, img_float, 0);
+		draw_rects_int(&netq, img_int, 4);
+
+		draw_rects(&net, img_both, 0);
+		draw_rects_int(&netq, img_both, 4);
+
+		cv::imshow("float_result", img_float);
+		cv::imshow("int_result", img_int);
+		cv::imshow("float_int_compare", img_both);
+
+		cv::imwrite("float_result.png", img_float);
+		cv::imwrite("int_result.png", img_int);
+		cv::imwrite("float_int_compare.png", img_both);
+
+		cv::waitKey(0);
 	}
 }
 
