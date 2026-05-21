@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{5ac325ca-6be8-4c3c-957f-e577f5491312}</ProjectGuid>
-    <RootNamespace>cvtforu31</RootNamespace>
+    <ProjectGuid>{112dd304-c196-4fbe-815e-5c681b20efb6}</ProjectGuid>
+    <RootNamespace>testpool320x160</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -78,8 +78,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(SolutionDir)source;D:\3rdparty_x64\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(SolutionDir)$(Platform)\$(Configuration)\;D:\3rdparty_x64\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\opencv\build\include;$(SolutionDir)source;D:\3rdparty_x64\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\opencv\build\x64\vc16\lib;$(SolutionDir)$(Platform)\$(Configuration)\;D:\3rdparty_x64\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
@@ -136,19 +136,18 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>C:\opencv\build\include;C:\u31-yolo\UpixNetwork\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\u31-yolo\UpixNetwork\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
-    <PostBuildEvent>
-      <Command>copy $(TargetPath) $(SolutionDir)..\cvt_tools\</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="cvt_for_u31.cpp" />
+    <ClCompile Include="test_shabao_192x192.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

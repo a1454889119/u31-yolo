@@ -19,9 +19,9 @@ enum class U31DataType
 {
 	None,
 	Conv_1x1,
-	Conv_3x3_Group,	// 3*3·Ö×é	
-//	Conv_5x5_Group,	// 5*5·Ö×é
-//	Conv_3x3x3,		// 3ÊäÈëÍ¨µÀ3*3
+	Conv_3x3_Group,	// 3*3ï¿½ï¿½ï¿½ï¿½	
+//	Conv_5x5_Group,	// 5*5ï¿½ï¿½ï¿½ï¿½
+//	Conv_3x3x3,		// 3ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½3*3
 Mul,
 };
 
@@ -106,7 +106,7 @@ static std::vector<stU31LayerData> makeU31Data(const UpixNetwork& net)
 				for (auto v : kernels) {
 					data.kernels.push_back((short)v);
 				}
-				// ×îÖÕµÄÊä³ö²ã²»×ö²ð·Ö
+				// ï¿½ï¿½ï¿½Õµï¿½ï¿½ï¿½ï¿½ï¿½ã²»ï¿½ï¿½ï¿½ï¿½ï¿½
 				if (info->inc >= 20 && info->refcount) {
 					int n = info->outc / info->inc;
 					if (n >= 2 && info->inc * n == info->outc) {
@@ -192,7 +192,7 @@ static void dump_quant_params(const char* filename, const std::vector<stU31Layer
 	FILE* fp = nullptr;
 	fopen_s(&fp, filename, "wt");
 	if (fp) {
-		// PAD VALUE·ÅÒ»Æð
+		// PAD VALUEï¿½ï¿½Ò»ï¿½ï¿½
 		for (auto& c : layerdata) {
 			if (c.pads.size()) {
 				if (c.pads.size() == 1) {
@@ -217,26 +217,26 @@ static void dump_quant_params(const char* filename, const std::vector<stU31Layer
 
 static void run_image(UpixNetwork* net, cv::Mat& img)
 {
-	cv::Mat inputImg = img;
-	if (img.cols == 320 && img.rows == 240) {
-		cv::Mat up = img(cv::Rect(0, 0, 320, 40));
-		cv::Mat down = img(cv::Rect(0, 200, 320, 40));
-		up = 0;
-		down = 0;
-		inputImg = img(cv::Rect(0, 40, 320, 160));
-	}
+    cv::Mat img_resized;
+    cv::resize(img, img_resized, cv::Size(192, 192));
 
-	cv::Mat imgfloat;
-	if (inputImg.channels() == 1) {
-		inputImg.convertTo(imgfloat, CV_32FC1);
-	}
-	else {
-		cv::cvtColor(inputImg, imgfloat, cv::COLOR_BGR2GRAY);
-		imgfloat.convertTo(imgfloat, CV_32FC1);
-	}
+    cv::Mat img_rgb;
+    if (img_resized.channels() == 3) {
+        cv::cvtColor(img_resized, img_rgb, cv::COLOR_BGR2RGB);
+    }
+    else if (img_resized.channels() == 1) {
+        cv::cvtColor(img_resized, img_rgb, cv::COLOR_GRAY2RGB);
+    }
+    else {
+        printf("unsupported image channels: %d\n", img_resized.channels());
+        return;
+    }
 
-	imgfloat *= 1.0f / 255.0f;
-	net->forward((float*)imgfloat.data);
+    cv::Mat imgfloat;
+    img_rgb.convertTo(imgfloat, CV_32FC3);
+    imgfloat *= 1.0f / 255.0f;
+
+    net->forward((float*)imgfloat.data);
 }
 
 
@@ -278,17 +278,17 @@ static bool dump_maxmin(const char* networkfilename, const char* weightsfilename
 		fopen_s(&fp, outputfilename, "wt");
 		if (fp) {
 			auto names = get_img_full_names(imagepath);
-			printf("%sÄ¿Â¼ÏÂÓÐ%d¸öÍ¼Æ¬\n", imagepath, (int)names.size());
+			printf("%sÄ¿Â¼ï¿½ï¿½ï¿½ï¿½%dï¿½ï¿½Í¼Æ¬\n", imagepath, (int)names.size());
 
 			std::vector<stMaxMin> mms(net.layers().size());
 			int total = (int)names.size();
 			int i = 0, failed = 0;
 			for (auto& name : names) {
 				printf("%5d(%3d)/%5d %s\r", i++, failed, total, name.c_str());
-				cv::Mat img = cv::imread(name.c_str(), 0);
+				cv::Mat img = cv::imread(name.c_str(), cv::IMREAD_COLOR);
 				if (img.empty()) {
 					failed++;
-					printf("\r%sÎÄ¼þÎÞÐ§\n", name.c_str());
+					printf("\r%sï¿½Ä¼ï¿½ï¿½ï¿½Ð§\n", name.c_str());
 					continue;
 				}
 				cv::resize(img, img, cv::Size(320, 160));
@@ -311,11 +311,11 @@ static bool dump_maxmin(const char* networkfilename, const char* weightsfilename
 			res = true;
 		}
 		else {
-			printf("´ò¿ªÎÄ¼þ%sÊ§°Ü!\n", outputfilename);
+			printf("ï¿½ï¿½ï¿½Ä¼ï¿½%sÊ§ï¿½ï¿½!\n", outputfilename);
 		}
 	}
 	else {
-		printf("¼ÓÔØÄ£ÐÍÎÄ¼þ(%s,%s)Ê§°Ü!\n", networkfilename, weightsfilename);
+		printf("ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½Ä¼ï¿½(%s,%s)Ê§ï¿½ï¿½!\n", networkfilename, weightsfilename);
 	}
 	return res;
 }
@@ -430,7 +430,7 @@ int main(int argc, char** argv)
 	//			dump_weights_upinc("weights_flash.upinc", layerdata, 0x44000);
 	//		}
 	//		else {
-	//			printf("¼ÓÔØ%sÊ§°Ü!\n", maxmin);
+	//			printf("ï¿½ï¿½ï¿½ï¿½%sÊ§ï¿½ï¿½!\n", maxmin);
 	//		}
 	//	}
 	//	return 0;
@@ -463,12 +463,12 @@ int main(int argc, char** argv)
 				dump_weights_upinc(weightsupinc, layerdata, 0x44000);
 			}
 			else {
-				printf("¼ÓÔØ%sÊ§°Ü!\n", maxminfilename);
+				printf("ï¿½ï¿½ï¿½ï¿½%sÊ§ï¿½ï¿½!\n", maxminfilename);
 			}
 		}
 	}
 	else {
-		printf("ÐèÒª7¸ö²ÎÊý!\n");
+		printf("ï¿½ï¿½Òª7ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½!\n");
 	}
 	system("pause");
 	return 0;
