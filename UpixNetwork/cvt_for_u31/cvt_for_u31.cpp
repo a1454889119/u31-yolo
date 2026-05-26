@@ -217,25 +217,32 @@ static void dump_quant_params(const char* filename, const std::vector<stU31Layer
 
 static void run_image(UpixNetwork* net, cv::Mat& img)
 {
-    cv::Mat img_resized;
-    cv::resize(img, img_resized, cv::Size(192, 192));
+    cv::Mat inputImg;
 
-    cv::Mat img_rgb;
-    if (img_resized.channels() == 3) {
-        cv::cvtColor(img_resized, img_rgb, cv::COLOR_BGR2RGB);
-    }
-    else if (img_resized.channels() == 1) {
-        cv::cvtColor(img_resized, img_rgb, cv::COLOR_GRAY2RGB);
+    // 如果输入本来就是 320x320，直接使用
+    if (img.cols == 320 && img.rows == 320) {
+        inputImg = img;
     }
     else {
-        printf("unsupported image channels: %d\n", img_resized.channels());
-        return;
+        // 其他尺寸统一 resize 到 320x320
+        cv::resize(img, inputImg, cv::Size(320, 320));
     }
 
     cv::Mat imgfloat;
-    img_rgb.convertTo(imgfloat, CV_32FC3);
+
+    // 转灰度 + float
+    if (inputImg.channels() == 1) {
+        inputImg.convertTo(imgfloat, CV_32FC1);
+    }
+    else {
+        cv::cvtColor(inputImg, imgfloat, cv::COLOR_BGR2GRAY);
+        imgfloat.convertTo(imgfloat, CV_32FC1);
+    }
+
+    // 归一化到 0~1
     imgfloat *= 1.0f / 255.0f;
 
+    // 送入网络
     net->forward((float*)imgfloat.data);
 }
 
@@ -285,13 +292,13 @@ static bool dump_maxmin(const char* networkfilename, const char* weightsfilename
 			int i = 0, failed = 0;
 			for (auto& name : names) {
 				printf("%5d(%3d)/%5d %s\r", i++, failed, total, name.c_str());
-				cv::Mat img = cv::imread(name.c_str(), cv::IMREAD_COLOR);
+				cv::Mat img = cv::imread(name.c_str(), 0);
 				if (img.empty()) {
 					failed++;
 					printf("\r%s�ļ���Ч\n", name.c_str());
 					continue;
 				}
-				cv::resize(img, img, cv::Size(320, 160));
+				cv::resize(img, img, cv::Size(320, 320));
 				run_image(&net, img);
 
 				for (auto layer : net.layers()) {
