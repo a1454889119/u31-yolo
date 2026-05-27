@@ -18,7 +18,8 @@
 #pragma comment(lib, "UpixNetworkUtils.lib")
 
 #define MODEL_DIR "D:/head_sole/ultralytics/runs/detect/train3/weights/"
-#define DEFAULT_IMAGE "D:/head_sole/data/dataset_2026_05_26/images/UPIX_Raw_2026-05-07_15-17-17_00001.png"
+#define DEFAULT_VIDEO "D:/data/UPIX_Raw_2026-05-07_15-17-17.mp4"
+#define DEFAULT_OUTPUT "D:/data/UPIX_Raw_2026-05-07_15-17-17_result.mp4"
 
 static const char* CLASS_NAMES[] = {
 	"front",
@@ -97,11 +98,11 @@ static void draw_targets(const std::vector<Target>& targets, cv::Mat& img, int c
 	}
 }
 
-static void test_image(const char* image_name)
+static void test_video(const char* video_name, const char* output_name)
 {
 	const char* network_name = MODEL_DIR"best.network.csv";
 	const char* weights_name = MODEL_DIR"best.weights.txt";
-	const char* maxmin_name = MODEL_DIR"best.maxmin.txt";
+	const char* maxmin_name  = MODEL_DIR"best.maxmin.txt";
 
 	UpixNetwork net;
 	if (!net.loadNetwork(network_name)) assert(0);
@@ -112,30 +113,77 @@ static void test_image(const char* image_name)
 	if (!netq.loadWeight(weights_name)) assert(0);
 	if (!netq.loadQuant(maxmin_name)) assert(0);
 
-	cv::Mat img = cv::imread(image_name, cv::IMREAD_GRAYSCALE);
-	if (img.empty()) {
-		printf("load image failed: %s\n", image_name);
+	cv::VideoCapture cap(video_name);
+	if (!cap.isOpened()) {
+		printf("load video failed: %s\n", video_name);
 		return;
 	}
-	cv::resize(img, img, cv::Size(INPUT_W, INPUT_H));
 
-	std::vector<Target> ftargets, itargets;
-	run_image(&net, &netq, img, ftargets, itargets);
+	double fps    = cap.get(cv::CAP_PROP_FPS);
+	int    width  = (int)cap.get(cv::CAP_PROP_FRAME_WIDTH);
+	int    height = (int)cap.get(cv::CAP_PROP_FRAME_HEIGHT);
+	int    total  = (int)cap.get(cv::CAP_PROP_FRAME_COUNT);
+	printf("video: %s  %dx%d  %.1f fps  %d frames\n", video_name, width, height, fps, total);
 
-	cv::Mat draw;
-	cv::cvtColor(img, draw, cv::COLOR_GRAY2BGR);
-	printf("-----float result\n");
-	draw_targets(ftargets, draw, 0);
-	printf("-----int result\n");
-	draw_targets(itargets, draw, 2);
+	// 输出视频写入器
+	cv::VideoWriter writer;
+	if (output_name && output_name[0] != '\0') {
+		int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
+		writer.open(output_name, fourcc, fps, cv::Size(INPUT_W, INPUT_H));
+		if (!writer.isOpened()) {
+			printf("warning: cannot open output video: %s\n", output_name);
+		}
+	}
 
-	cv::imshow("head_sole_320x320", draw);
-	cv::waitKey(0);
+	cv::Mat frame, gray;
+	int frame_idx = 0;
+	while (true) {
+		if (!cap.read(frame) || frame.empty()) break;
+		frame_idx++;
+
+		// 转灰度并缩放到网络输入尺寸
+		if (frame.channels() == 3)
+			cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+		else
+			gray = frame.clone();
+		cv::resize(gray, gray, cv::Size(INPUT_W, INPUT_H));
+
+		// 推理
+		std::vector<Target> ftargets, itargets;
+		run_image(&net, &netq, gray, ftargets, itargets);
+
+		// 绘制结果
+		cv::Mat draw;
+		cv::cvtColor(gray, draw, cv::COLOR_GRAY2BGR);
+		draw_targets(itargets, draw, 0);
+
+		// 显示帧号
+		char info[64];
+		snprintf(info, sizeof(info), "frame %d/%d", frame_idx, total);
+		cv::putText(draw, info, cv::Point(4, 16), cv::FONT_HERSHEY_SIMPLEX, 0.45, CV_RGB(0xff, 0xff, 0x00), 1);
+
+		cv::imshow("head_sole_320x320", draw);
+
+		if (writer.isOpened())
+			writer.write(draw);
+
+		// 按 'q' 或 ESC 退出
+		int key = cv::waitKey(1);
+		if (key == 'q' || key == 27) break;
+	}
+
+	cap.release();
+	if (writer.isOpened()) {
+		writer.release();
+		printf("result saved to: %s\n", output_name);
+	}
+	cv::destroyAllWindows();
 }
 
 int main(int argc, char** argv)
 {
-	const char* image_name = argc > 1 ? argv[1] : DEFAULT_IMAGE;
-	test_image(image_name);
+	const char* video_name  = argc > 1 ? argv[1] : DEFAULT_VIDEO;
+	const char* output_name = argc > 2 ? argv[2] : DEFAULT_OUTPUT;
+	test_video(video_name, output_name);
 	return 0;
 }
