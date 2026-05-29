@@ -44,9 +44,30 @@ static const int INPUT_H = 320;
 
 static void run_image(UpixNetwork* net, UpixNetwork* qnet, cv::Mat& img, std::vector<Target>& ftargets, std::vector<Target>& itargets)
 {
-	cv::Mat inputImg = img;
-	if (inputImg.cols != INPUT_W || inputImg.rows != INPUT_H) {
-		cv::resize(inputImg, inputImg, cv::Size(INPUT_W, INPUT_H));
+	cv::Mat inputImg;
+	float scale = 1.0f;
+	int pad_x = 0;
+	int pad_y = 0;
+	bool need_letterbox = (img.cols != INPUT_W || img.rows != INPUT_H);
+
+	if (need_letterbox) {
+		scale = std::min((float)INPUT_W / img.cols, (float)INPUT_H / img.rows);
+		int new_w = (int)(img.cols * scale);
+		int new_h = (int)(img.rows * scale);
+		pad_x = (INPUT_W - new_w) / 2;
+		pad_y = (INPUT_H - new_h) / 2;
+
+		cv::Mat resized;
+		cv::resize(img, resized, cv::Size(new_w, new_h));
+		if (img.channels() == 1) {
+			inputImg = cv::Mat(INPUT_H, INPUT_W, CV_8UC1, cv::Scalar(114));
+		} else {
+			inputImg = cv::Mat(INPUT_H, INPUT_W, CV_8UC3, cv::Scalar(114, 114, 114));
+		}
+		resized.copyTo(inputImg(cv::Rect(pad_x, pad_y, new_w, new_h)));
+	}
+	else {
+		inputImg = img;
 	}
 
 	cv::Mat imgfloat;
@@ -76,6 +97,21 @@ static void run_image(UpixNetwork* net, UpixNetwork* qnet, cv::Mat& img, std::ve
 	dec.decode(qnet->output(C2_0_IDX).iptr, qnet->output(C40_0_IDX).iptr, qnet->output(C2_0_IDX).w, qnet->output(C2_0_IDX).h, TYPE_COUNT, 8);
 	dec.decode(qnet->output(C2_1_IDX).iptr, qnet->output(C40_1_IDX).iptr, qnet->output(C2_1_IDX).w, qnet->output(C2_1_IDX).h, TYPE_COUNT, 4);
 	itargets = dec.getTargets();
+
+	if (need_letterbox) {
+		for (auto& tar : ftargets) {
+			tar.x = (tar.x - pad_x) / scale;
+			tar.y = (tar.y - pad_y) / scale;
+			tar.w /= scale;
+			tar.h /= scale;
+		}
+		for (auto& tar : itargets) {
+			tar.x = (tar.x - pad_x) / scale;
+			tar.y = (tar.y - pad_y) / scale;
+			tar.w /= scale;
+			tar.h /= scale;
+		}
+	}
 }
 
 static void draw_targets(const std::vector<Target>& targets, cv::Mat& img, int color_idx)
@@ -129,7 +165,7 @@ static void test_video(const char* video_name, const char* output_name)
 	cv::VideoWriter writer;
 	if (output_name && output_name[0] != '\0') {
 		int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
-		writer.open(output_name, fourcc, fps, cv::Size(INPUT_W, INPUT_H));
+		writer.open(output_name, fourcc, fps, cv::Size(width, height));
 		if (!writer.isOpened()) {
 			printf("warning: cannot open output video: %s\n", output_name);
 		}
@@ -141,20 +177,18 @@ static void test_video(const char* video_name, const char* output_name)
 		if (!cap.read(frame) || frame.empty()) break;
 		frame_idx++;
 
-		// 转灰度并缩放到网络输入尺寸
+		// 转灰度
 		if (frame.channels() == 3)
 			cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
 		else
 			gray = frame.clone();
-		cv::resize(gray, gray, cv::Size(INPUT_W, INPUT_H));
 
-		// 推理
+		// 推理（run_image 内部会自动处理 letterbox 并把输出的目标坐标还原回 gray 的尺寸）
 		std::vector<Target> ftargets, itargets;
 		run_image(&net, &netq, gray, ftargets, itargets);
 
 		// 绘制结果
-		cv::Mat draw;
-		cv::cvtColor(gray, draw, cv::COLOR_GRAY2BGR);
+		cv::Mat draw = frame.clone();
 		draw_targets(itargets, draw, 0);
 
 		// 显示帧号
