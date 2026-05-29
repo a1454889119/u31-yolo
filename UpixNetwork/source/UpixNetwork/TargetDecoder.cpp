@@ -340,7 +340,7 @@ static void decode_rects_int(
 }
 #define MAX_TYPE_COUNT 8
 #define MAX_W 80
-#define MAX_H 40
+#define MAX_H 80
 #define MAX_CWH_DATA_COUNT MAX_W*MAX_H*(40+MAX_TYPE_COUNT)
 
 class TargetDecoderPrivate {
